@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance — Панель администратора</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1A73E8;
+      --primary-dark: #0D47A1;
+      --accent: #00C853;
+      --warning: #FFB300;
+      --error: #E53935;
+      --surface: #F8F9FE;
+      --card: #FFFFFF;
+      --border: #EEEEF5;
+      --text-main: #1A1A2E;
+      --text-sub: #666688;
+      --text-muted: #A0A0BB;
+      --sidebar-bg: #0F172A;
+      --sidebar-hover: rgba(255,255,255,0.07);
+      --sidebar-active: rgba(26,115,232,0.18);
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--surface);
+      color: var(--text-main);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      flex-shrink: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .sidebar-logo .logo-icon {
+      width: 42px; height: 42px;
+      background: rgba(26,115,232,0.2);
+      border: 1.5px solid rgba(26,115,232,0.4);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .sidebar-logo h1 {
+      font-size: 17px; font-weight: 800;
+      color: #fff; line-height: 1.2;
+    }
+
+    .sidebar-logo p {
+      font-size: 11px; color: rgba(255,255,255,0.35);
+      margin-top: 2px;
+    }
+
+    .sidebar-section {
+      padding: 16px 12px 4px;
+    }
+
+    .sidebar-section-label {
+      font-size: 10px; font-weight: 700;
+      color: rgba(255,255,255,0.25);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 0 8px;
+      margin-bottom: 6px;
+    }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.55);
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+    }
+
+    .sidebar-item:hover { background: var(--sidebar-hover); color: #fff; }
+    .sidebar-item.active { background: var(--sidebar-active); color: #fff; }
+    .sidebar-item.active .nav-icon { color: var(--primary); }
+    .nav-icon { font-size: 16px; }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .sidebar-user {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+    }
+
+    .user-avatar {
+      width: 36px; height: 36px;
+      background: rgba(26,115,232,0.3);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; color: var(--primary); font-size: 14px;
+    }
+
+    .user-info .user-name { color: #fff; font-size: 13px; font-weight: 700; }
+    .user-info .user-role { color: rgba(255,255,255,0.35); font-size: 11px; }
+
+    /* MAIN */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .topbar-title { font-size: 20px; font-weight: 800; }
+
+    .topbar-actions { display: flex; align-items: center; gap: 12px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 18px;
+      border: none; cursor: pointer;
+      border-radius: 10px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px; font-weight: 700;
+      transition: all 0.15s;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-ghost { background: transparent; color: var(--text-sub); border: 1.5px solid var(--border); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px;
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+    }
+
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .card-title { font-size: 16px; font-weight: 700; }
+
+    /* STATS GRID */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .stat-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .stat-value { font-size: 32px; font-weight: 900; line-height: 1; }
+    .stat-label { font-size: 13px; color: var(--text-sub); font-weight: 600; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      text-align: left;
+      font-size: 11px; font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr { transition: background 0.1s; }
+    tbody tr:hover { background: var(--surface); }
+
+    tbody td {
+      padding: 14px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* BADGE */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px; font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    .badge-present { background: rgba(0,200,83,0.12); color: #00C853; border: 1px solid rgba(0,200,83,0.25); }
+    .badge-late { background: rgba(255,179,0,0.12); color: #FFB300; border: 1px solid rgba(255,179,0,0.25); }
+    .badge-absent { background: rgba(229,57,53,0.12); color: #E53935; border: 1px solid rgba(229,57,53,0.25); }
+    .badge-incomplete { background: rgba(123,97,255,0.12); color: #7B61FF; border: 1px solid rgba(123,97,255,0.25); }
+    .badge-completed { background: rgba(26,115,232,0.12); color: #1A73E8; border: 1px solid rgba(26,115,232,0.25); }
+    .badge-manual { background: rgba(158,158,158,0.12); color: #9E9E9E; border: 1px solid rgba(158,158,158,0.25); }
+    .badge-approved-absence { background: rgba(92,107,192,0.12); color: #5C6BC0; border: 1px solid rgba(92,107,192,0.25); }
+    .badge-active { background: rgba(0,200,83,0.1); color: #00C853; border: 1px solid rgba(0,200,83,0.2); }
+    .badge-inactive { background: rgba(229,57,53,0.1); color: #E53935; border: 1px solid rgba(229,57,53,0.2); }
+
+    /* GRID */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+    /* SECTION HEADER */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 22px; font-weight: 800;
+    }
+
+    /* TABS */
+    .tabs {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 8px 18px;
+      border: none; cursor: pointer;
+      border-radius: 8px;
+      background: transparent;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px; font-weight: 700;
+      color: var(--text-sub);
+      transition: all 0.15s;
+    }
+
+    .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+    /* FILTERS */
+    .filters {
+      display: flex; gap: 12px; align-items: center;
+      margin-bottom: 20px; flex-wrap: wrap;
+    }
+
+    .filter-input {
+      padding: 9px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px; font-weight: 600;
+      color: var(--text-main);
+      background: var(--card);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .filter-input:focus { border-color: var(--primary); }
+
+    /* PAGE VISIBILITY */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      width: 480px; max-width: 90vw;
+      max-height: 85vh; overflow-y: auto;
+      transform: translateY(20px);
+      transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 800; }
+
+    .modal-close {
+      width: 32px; height: 32px;
+      background: var(--surface); border: none; cursor: pointer;
+      border-radius: 8px; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-sub);
+    }
+
+    .modal-close:hover { background: var(--border); }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 13px; font-weight: 700; color: var(--text-sub); margin-bottom: 6px; display: block; }
+
+    .form-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px; font-weight: 600;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-input:focus { border-color: var(--primary); }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .modal-footer {
+      display: flex; gap: 12px; justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    /* LOGIN PAGE */
+    .login-page {
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #1A1A2E, #16213E, #0F3460);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2000;
+    }
+
+    .login-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 40px;
+      width: 400px;
+    }
+
+    .login-logo {
+      width: 56px; height: 56px;
+      background: rgba(26,115,232,0.2);
+      border: 1.5px solid rgba(26,115,232,0.4);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      margin-bottom: 20px;
+    }
+
+    .login-title { font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .login-sub { font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 32px; }
+
+    .login-field {
+      width: 100%;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px; font-weight: 600;
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.15s;
+    }
+
+    .login-field:focus { border-color: rgba(26,115,232,0.8); }
+    .login-field::placeholder { color: rgba(255,255,255,0.3); }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      border: none; cursor: pointer;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Nunito', sans-serif;
+      font-size: 16px; font-weight: 800;
+      margin-top: 8px;
+      transition: background 0.15s;
+    }
+    
+
+    .login-btn:hover { background: var(--primary-dark); }
+
+    .login-error {
+      background: rgba(229,57,53,0.15);
+      border: 1px solid rgba(229,57,53,0.3);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--error);
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* QR section */
+    .qr-container {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 32px;
+      background: var(--surface);
+      border-radius: 16px;
+    }
+
+    .qr-container img {
+      border-radius: 12px;
+      border: 3px solid var(--border);
+    }
+
+    /* CHARTS placeholder */
+    .chart-placeholder {
+      height: 200px;
+      background: var(--surface);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .progress-bar-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .progress-label { font-size: 13px; font-weight: 700; width: 100px; color: var(--text-sub); }
+    .progress-bar { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .progress-val { font-size: 13px; font-weight: 700; width: 40px; text-align: right; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 14px; font-weight: 700;
+      color: #fff;
+      transform: translateY(80px);
+      transition: transform 0.3s ease;
+      z-index: 9999;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .toast.show { transform: translateY(0); }
+    .toast.success { background: #00C853; }
+    .toast.error { background: #E53935; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div class="login-page" id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">🔐</div>
+    <h1 class="login-title">Attendance</h1>
+    <p class="login-sub">Панель администратора</p>
+    <div class="login-error" id="loginError"></div>
+    <input type="text" class="login-field" id="loginUsername" placeholder="Логин или email" value="admin">
+    <input type="password" class="login-field" id="loginPassword" placeholder="Пароль" value="admin123">
+    <button class="login-btn" onclick="doLogin()">Войти</button>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📊</div>
+    <h1>Attendance</h1>
+    <p>Админ панель</p>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Главная</p>
+    <div class="sidebar-item active" onclick="showPage('dashboard', this)">
+      <span class="nav-icon">🏠</span> Дашборд
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Управление</p>
+    <div class="sidebar-item" onclick="showPage('employees', this)">
+      <span class="nav-icon">👥</span> Сотрудники
+    </div>
+    <div class="sidebar-item" onclick="showPage('attendance', this)">
+      <span class="nav-icon">✅</span> Посещаемость
+    </div>
+    <div class="sidebar-item" onclick="showPage('networks', this)">
+      <span class="nav-icon">🌐</span> Сети офисов
+    </div>
+    <div class="sidebar-item" onclick="showPage('qr', this)">
+      <span class="nav-icon">📷</span> QR-коды
+    </div>
+    <div class="sidebar-item" onclick="showPage('requests', this)">
+      <span class="nav-icon">📝</span> Заявки
+      <span id="requestsBadge" style="margin-left:auto; background:#E53935; color:#fff; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; display:none">0</span>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Аналитика</p>
+    <div class="sidebar-item" onclick="showPage('reports', this)">
+      <span class="nav-icon">📈</span> Отчёты
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebarAvatar">A</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebarName">Admin</div>
+        <div class="user-role">Администратор</div>
+      </div>
+    </div>
+    <div class="sidebar-item" onclick="doLogout()" style="margin-top:4px; color: rgba(229,57,53,0.7)">
+      <span class="nav-icon">🚪</span> Выйти
+    </div>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="pageTitle">Дашборд</div>
+    <div class="topbar-actions">
+      <div id="topbarDate" style="font-size:13px; color: var(--text-sub); font-weight:600;"></div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Обзор</div>
+          <div style="font-size:13px; color: var(--text-sub); margin-top:4px" id="dashDate"></div>
+        </div>
+        <button class="btn btn-primary" onclick="loadDashboard()">🔄 Обновить</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(26,115,232,0.1)">👥</div>
+          <div>
+            <div class="stat-value" style="color:var(--primary)" id="statTotal">—</div>
+            <div class="stat-label">Всего сотрудников</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(0,200,83,0.1)">✅</div>
+          <div>
+            <div class="stat-value" style="color:var(--accent)" id="statPresent">—</div>
+            <div class="stat-label">Сейчас в офисе</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(255,179,0,0.1)">⚠️</div>
+          <div class="sidebar-item" onclick="showPage('worktime', this)">
+         <div class="nav-icon" style="background:hsla(5, 100%, 50%, 0.114)">⏰</div>
+          <div class="sidebar-item" onclick="showPage('worktime', this)"></div>
+        </div>
+          <div>
+            <div class="stat-value" style="color:var(--warning)" id="statLate">—</div>
+            <div class="stat-label">Опоздали</div>
+          </div>
+          <!-- ------- Adding coditions --------->
+
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(229,57,53,0.1)">❌</div>
+          <div>
+            <div class="stat-value" style="color:var(--error)" id="statAbsent">—</div>
+          <div class="stat-label">Не пришли сегодня</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Посещаемость сегодня</div>
+          </div>
+          <div id="attendanceRate" style="font-size:48px; font-weight:900; color:var(--primary); margin-bottom:8px">—%</div>
+          <div style="font-size:13px; color:var(--text-sub)">Процент присутствия</div>
+          <div style="height:16px"></div>
+          <div id="progressBars"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Последние записи</div>
+          </div>
+          <div id="latestRecords"></div>
+        </div>
+      </div>
+    </div>
+
+
+<div class="modal-overlay" id="modal-manualCheckout">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Ручной уход</div>
+      <button class="modal-close" onclick="closeModal('manualCheckout')">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Сотрудник</label>
+      <input class="form-input" id="manualCheckoutEmployee" disabled>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Дата и время ухода</label>
+      <input class="form-input" id="manualCheckoutTime" type="datetime-local">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Комментарий</label>
+      <input class="form-input" id="manualCheckoutNote" placeholder="Например: сотрудник забыл отметить уход">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('manualCheckout')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveManualCheckout()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-approvedAbsence">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Разрешённое отсутствие</div>
+      <button class="modal-close" onclick="closeModal('approvedAbsence')">✕</button>
+    </div>
+    <p style="color:var(--text-sub); font-size:13px; margin-bottom:16px">Укажите, что сотруднику дано разрешение не прийти (больничный, отпуск, удалёнка и т.д.).</p>
+    <div class="form-group">
+      <label class="form-label">Сотрудник</label>
+      <select class="form-input" id="approvedAbsenceEmployeeId">
+        <option value="">— Выберите сотрудника —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Дата</label>
+      <input class="form-input" id="approvedAbsenceDate" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Комментарий (причина)</label>
+      <textarea class="form-input" id="approvedAbsenceNote" rows="3" placeholder="Например: больничный, отпуск, удалённая работа"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('approvedAbsence')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveApprovedAbsence()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+    <!-- EMPLOYEES PAGE -->
+    <div class="page" id="page-employees">
+      <div class="section-header">
+        <div class="section-title">Сотрудники</div>
+        <button class="btn btn-primary" onclick="openModal('addEmployee')">+ Добавить</button>
+      </div>
+
+      <div class="filters">
+  <input type="text" class="filter-input" placeholder="🔍 Поиск по имени..." id="empSearch" oninput="filterEmployees()" style="width:260px">
+  <input type="text" class="filter-input" placeholder="Отдел" id="empDeptFilter" oninput="filterEmployees()">
+  <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-sub)">
+    <input type="checkbox" id="showInactiveEmployees" onchange="loadEmployees()">
+    Показать неактивных
+  </label>
+</div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Сотрудник</th>
+                <th>Отдел</th>
+                <th>Должность</th>
+                <th>Email</th>
+                <th>Статус</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="employeesTable">
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE PAGE -->
+    <div class="page" id="page-attendance">
+      <div class="section-header">
+        <div class="section-title">Посещаемость</div>
+        <button class="btn btn-ghost" style="border-color:var(--primary); color:var(--primary)" onclick="openApprovedAbsenceModal()">✓ Разрешённое отсутствие</button>
+      </div>
+
+      <div class="filters">
+        <input type="date" class="filter-input" id="attStartDate">
+        <span style="color:var(--text-sub); font-weight:600">—</span>
+        <input type="date" class="filter-input" id="attEndDate">
+        <input type="number" class="filter-input" placeholder="ID сотрудника" id="attEmpId" style="width:160px">
+        <button class="btn btn-primary btn-sm" onclick="loadAttendance()">Применить</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetAttFilters()">Сбросить</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+  <tr>
+    <th>Дата</th>
+    <th>Сотрудник</th>
+    <th>Приход</th>
+    <th>Уход</th>
+    <th>Рабочее время</th>
+    <th>Статус</th>
+    <th>Опоздание</th>
+    <th>Раньше пришёл</th>
+    <th>Раньше ушёл</th>
+    <th>Позже ушёл</th>
+    <th>Действия</th>
+  </tr>
+</thead>
+            <tbody id="attendanceTable">
+              <tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- conditions-->
+
+  <div class="page" id="page-worktime">
+  <div class="section-header">
+    <div class="section-title">Рабочее время</div>
+  </div>
+
+  <div class="card" style="max-width:760px">
+    <div class="card-header">
+      <div class="card-title">Настройки графика</div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Начало работы — час</label>
+        <input class="form-input" id="workStartHour" type="number" min="0" max="23">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Начало работы — минуты</label>
+        <input class="form-input" id="workStartMinute" type="number" min="0" max="59">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Конец работы — час</label>
+        <input class="form-input" id="workEndHour" type="number" min="0" max="23">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Конец работы — минуты</label>
+        <input class="form-input" id="workEndMinute" type="number" min="0" max="59">
+      </div>
+
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Допустимое опоздание (минут)</label>
+        <input class="form-input" id="gracePeriodMinutes" type="number" min="0" max="180">
+      </div>
+    </div>
+
+    <div style="display:grid; gap:12px; margin-top:12px">
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countEarlyArrival">
+        Учитывать ранний приход
+      </label>
+
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countEarlyLeave">
+        Учитывать ранний уход
+      </label>
+
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countOvertime">
+        Учитывать переработку
+      </label>
+    </div>
+
+    <div class="modal-footer" style="margin-top:24px; justify-content:flex-start">
+      <button class="btn btn-primary" onclick="saveWorkTimeSettings()">Сохранить</button>
+      <button class="btn btn-ghost" onclick="loadWorkTimeSettings()">Обновить</button>
+    </div>
+  </div>
+</div>
+
+    <!-- NETWORKS PAGE -->
+     <div class="page" id="page-networks">
+  <div class="section-header">
+    <div class="section-title">Офисные сети</div>
+    <button class="btn btn-primary" onclick="openModal('addNetwork')">+ Добавить сеть</button>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>IP-адрес</th>
+            <th>Диапазон IP</th>
+            <th>Описание</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="networksTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+    <!-- QR PAGE -->
+<div class="page" id="page-qr">
+  <div class="section-header">
+    <div class="section-title">Управление QR-кодом</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Текущий QR-код</div>
+        <button class="btn btn-primary btn-sm" onclick="loadCurrentQR()">Обновить</button>
+      </div>
+      <div class="qr-container" id="qrContainer">
+        <p style="color:var(--text-muted)">Загрузка QR-кода...</p>
+      </div>
+      <div style="margin-top:16px; text-align:center">
+        <button class="btn btn-primary" onclick="generateNewQR()" style="width:100%">🔄 Сгенерировать новый QR</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Инструкция</div></div>
+      <div style="color:var(--text-sub); font-size:14px; line-height:1.8">
+        <p>1. Распечатайте или отобразите QR-код в офисе</p>
+        <p style="margin-top:8px">2. Сотрудники сканируют его при приходе/уходе через мобильное приложение</p>
+        <p style="margin-top:8px">3. Система проверяет QR и IP-адрес офисной сети</p>
+        <p style="margin-top:8px">4. При необходимости сгенерируйте новый QR или активируйте старый</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <div class="card-title">История QR-кодов</div>
+      <button class="btn btn-primary btn-sm" onclick="loadQrHistory()">Обновить</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Тип</th>
+            <th>Создан</th>
+            <th>Истекает</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="qrHistoryTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+    <!-- REPORTS PAGE -->
+    <div class="page" id="page-reports">
+  <div class="section-header">
+    <div class="section-title">Отчёты</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchReportTab('daily', this)">Дневной</button>
+    <button class="tab-btn" onclick="switchReportTab('monthly', this)">Месячный</button>
+  </div>
+
+  <div id="reportContent"></div>
+</div>
+
+    <!-- REQUESTS PAGE -->
+    <div class="page" id="page-requests">
+      <div class="section-header">
+        <div class="section-title">Заявки сотрудников</div>
+      </div>
+
+      <div class="filters">
+        <select class="filter-input" id="reqStatus" style="width:220px">
+          <option value="">Все статусы</option>
+          <option value="new">Новая</option>
+          <option value="reviewing">Рассматривается</option>
+          <option value="approved">Одобрена</option>
+          <option value="rejected">Отклонена</option>
+          <option value="needs_clarification">Нужно уточнение</option>
+        </select>
+        <input type="number" class="filter-input" id="reqEmpId" placeholder="ID сотрудника" style="width:160px">
+        <select class="filter-input" id="reqType" style="width:240px">
+          <option value="">Все типы</option>
+          <option value="sick">Больничный</option>
+          <option value="family">Семейные обстоятельства</option>
+          <option value="vacation">Отпуск</option>
+          <option value="business_trip">Командировка</option>
+          <option value="remote_work">Удалённая работа</option>
+          <option value="late_reason">Опоздание (по причине)</option>
+          <option value="early_leave">Ранний уход (по причине)</option>
+          <option value="other">Другое</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="loadRequests()">Применить</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetRequestFilters()">Сбросить</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Сотрудник</th>
+                <th>Тип</th>
+                <th>Период</th>
+                <th>Комментарий сотрудника</th>
+                <th>Статус</th>
+                <th>Комментарий админа</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="requestsTable">
+              <tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+<!-- Add Employee Modal -->
+<div class="modal-overlay" id="modal-addEmployee">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Новый сотрудник</div>
+      <button class="modal-close" onclick="closeModal('addEmployee')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">ФИО *</label>
+        <input class="form-input" id="empFullName" placeholder="Иванов Иван Иванович">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input class="form-input" id="empEmail" type="email" placeholder="ivan@company.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Телефон</label>
+        <input class="form-input" id="empPhone" placeholder="+7 999 000 00 00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Отдел</label>
+        <input class="form-input" id="empDept" placeholder="Разработка">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Должность</label>
+        <input class="form-input" id="empPos" placeholder="Разработчик">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Логин *</label>
+        <input class="form-input" id="empUsername" placeholder="ivan.ivanov">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пароль *</label>
+        <input class="form-input" id="empPassword" type="password" placeholder="••••••••">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addEmployee')">Отмена</button>
+      <button class="btn btn-primary" onclick="createEmployee()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Network Modal -->
+<div class="modal-overlay" id="modal-addNetwork">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Добавить офисную сеть</div>
+      <button class="modal-close" onclick="closeModal('addNetwork')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название *</label>
+      <input class="form-input" id="netName" placeholder="Главный офис">
+    </div>
+    <div class="form-group">
+      <label class="form-label">IP-адрес офиса</label>
+      <input class="form-input" id="netIp" placeholder="203.0.113.10">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Диапазон IP (CIDR)</label>
+      <input class="form-input" id="netRange" placeholder="192.168.1.0/24">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Описание</label>
+      <input class="form-input" id="netDesc" placeholder="Описание сети">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addNetwork')">Отмена</button>
+      <button class="btn btn-primary" onclick="createNetwork()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://192.168.50.177:8000/api/v1';
+let accessToken = localStorage.getItem('access_token');
+let allEmployees = [];
+let allAttendance = [];
+
+async function loadWorkTimeSettings() {
+  try {
+    const data = await apiFetch('/settings/work-time');
+
+    document.getElementById('workStartHour').value = data.work_start_hour;
+    document.getElementById('workStartMinute').value = data.work_start_minute;
+    document.getElementById('workEndHour').value = data.work_end_hour;
+    document.getElementById('workEndMinute').value = data.work_end_minute;
+    document.getElementById('gracePeriodMinutes').value = data.grace_period_minutes;
+
+    document.getElementById('countEarlyArrival').checked = !!data.count_early_arrival;
+    document.getElementById('countEarlyLeave').checked = !!data.count_early_leave;
+    document.getElementById('countOvertime').checked = !!data.count_overtime;
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+let currentManualAttendanceId = null;
+
+function openManualCheckout(attendanceId, employeeName) {
+  currentManualAttendanceId = attendanceId;
+  document.getElementById('manualCheckoutEmployee').value = employeeName || '';
+  document.getElementById('manualCheckoutNote').value = '';
+
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+
+  document.getElementById('manualCheckoutTime').value = local;
+
+  openModal('manualCheckout');
+}
+
+async function saveManualCheckout() {
+  try {
+    if (!currentManualAttendanceId) {
+      showToast('Не выбрана запись', 'error');
+      return;
+    }
+
+    const timeValue = document.getElementById('manualCheckoutTime').value;
+    const noteValue = document.getElementById('manualCheckoutNote').value;
+
+    if (!timeValue) {
+      showToast('Укажите время ухода', 'error');
+      return;
+    }
+
+    const payload = {
+      check_out_time: new Date(timeValue).toISOString(),
+      note: noteValue || null
+    };
+
+    await apiFetch(`/attendance/${currentManualAttendanceId}/manual-checkout`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+
+    closeModal('manualCheckout');
+    showToast('Уход сохранён вручную', 'success');
+    loadAttendance();
+    loadDashboard();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function openApprovedAbsenceModal() {
+  try {
+    const employees = await apiFetch('/employees?include_inactive=false') || [];
+    const sel = document.getElementById('approvedAbsenceEmployeeId');
+    sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
+      employees.map(e => `<option value="${e.id}">${e.full_name} (${e.department || '—'})</option>`).join('');
+    document.getElementById('approvedAbsenceDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('approvedAbsenceNote').value = '';
+    openModal('approvedAbsence');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function saveApprovedAbsence() {
+  try {
+    const employeeId = document.getElementById('approvedAbsenceEmployeeId').value;
+    const dateVal = document.getElementById('approvedAbsenceDate').value;
+    const note = document.getElementById('approvedAbsenceNote').value?.trim();
+
+    if (!employeeId) {
+      showToast('Выберите сотрудника', 'error');
+      return;
+    }
+    if (!dateVal) {
+      showToast('Укажите дату', 'error');
+      return;
+    }
+    if (!note) {
+      showToast('Укажите комментарий (причину отсутствия)', 'error');
+      return;
+    }
+
+    await apiFetch('/attendance/mark-approved-absence', {
+      method: 'POST',
+      body: JSON.stringify({ employee_id: Number(employeeId), date: dateVal, note })
+    });
+
+    closeModal('approvedAbsence');
+    showToast('Разрешённое отсутствие сохранено', 'success');
+    loadAttendance();
+    loadDashboard();
+    if (typeof loadDailyReport === 'function') loadDailyReport();
+  } catch (e) {
+    showToast(e.message || e.detail || 'Ошибка', 'error');
+  }
+}
+
+
+
+async function saveWorkTimeSettings() {
+  try {
+    const payload = {
+      work_start_hour: Number(document.getElementById('workStartHour').value),
+      work_start_minute: Number(document.getElementById('workStartMinute').value),
+      work_end_hour: Number(document.getElementById('workEndHour').value),
+      work_end_minute: Number(document.getElementById('workEndMinute').value),
+      grace_period_minutes: Number(document.getElementById('gracePeriodMinutes').value),
+      count_early_arrival: document.getElementById('countEarlyArrival').checked,
+      count_early_leave: document.getElementById('countEarlyLeave').checked,
+      count_overtime: document.getElementById('countOvertime').checked
+    };
+
+    await apiFetch('/settings/work-time', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    showToast('Настройки рабочего времени сохранены', 'success');
+    loadWorkTimeSettings();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// =========== AUTH ===========
+async function doLogin() {
+  const u = document.getElementById('loginUsername').value;
+  const p = document.getElementById('loginPassword').value;
+  try {
+    const r = await fetch(`${API}/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username:u, password:p})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Ошибка');
+    accessToken = d.access_token;
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', d.refresh_token);
+    document.getElementById('loginPage').style.display = 'none';
+    initApp();
+  } catch(e) {
+    const el = document.getElementById('loginError');
+    el.style.display = 'block';
+    el.textContent = e.message;
+  }
+}
+
+async function doLogout() {
+  localStorage.clear();
+  location.reload();
+}
+
+async function apiFetch(url, opts={}) {
+  opts.headers = {...(opts.headers||{}), 'Authorization': `Bearer ${accessToken}`, 'Content-Type':'application/json'};
+  let r = await fetch(API+url, opts);
+  if (r.status === 401) {
+    const ok = await tryRefresh();
+    if (ok) {
+      opts.headers['Authorization'] = `Bearer ${accessToken}`;
+      r = await fetch(API+url, opts);
+    } else { doLogout(); return null; }
+  }
+  if (!r.ok) {
+    const d = await r.json().catch(()=>({}));
+    throw new Error(d.detail || 'API Error');
+  }
+  return r.json();
+}
+
+async function tryRefresh() {
+  const rt = localStorage.getItem('refresh_token');
+  if (!rt) return false;
+  try {
+    const r = await fetch(`${API}/auth/refresh`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({refresh_token:rt})
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    accessToken = d.access_token;
+    localStorage.setItem('access_token', accessToken);
+    return true;
+  } catch { return false; }
+}
+
+// =========== INIT ===========
+async function initApp() {
+  document.getElementById('topbarDate').textContent = new Date().toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+  try {
+    const me = await apiFetch('/auth/me');
+    if (me) {
+      document.getElementById('sidebarName').textContent = me.username;
+      document.getElementById('sidebarAvatar').textContent = me.username[0].toUpperCase();
+    }
+  } catch(_) {}
+  loadDashboard();
+  loadRequestsBadge();
+}
+
+// =========== NAVIGATION ===========
+function showPage(name, el) {
+  
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+  const titles = {dashboard:'Дашборд',
+   employees:'Сотрудники',
+    attendance:'Посещаемость', 
+    networks:'Офисные сети', 
+    qr:'QR-коды', 
+    reports:'Отчёты',
+    worktime:'Рабочее время',
+    requests:'Заявки'};
+  document.getElementById('pageTitle').textContent = titles[name] || name;
+
+  if (name==='employees') loadEmployees();
+  else if (name==='attendance') { setDefaultDates(); loadAttendance(); }
+  else if (name==='networks') loadNetworks();
+else if (name==='qr') { loadCurrentQR(); loadQrHistory(); }
+  else if (name==='reports') loadDailyReport();
+  else if (name==='worktime') loadWorkTimeSettings();
+  else if (name==='requests') loadRequests();
+  
+}
+
+// =========== DASHBOARD ===========
+async function loadDashboard() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const report = await apiFetch(`/reports/daily?report_date=${today}`);
+    const s = report.summary;
+
+    const total = Math.max(Number(s.total_employees || 0), 0);
+    const workedToday = Math.max(Number(s.worked_today || 0), 0);
+    const inOfficeNow = Math.max(Number(s.in_office_now || 0), 0);
+    const late = Math.max(Number(s.late || 0), 0);
+    const absent = Math.max(Number(s.absent || 0), 0);
+    const approvedAbsence = Math.max(Number(s.approved_absence || 0), 0);
+    const completed = Math.max(Number(s.completed || 0), 0);
+    const incomplete = Math.max(Number(s.incomplete || 0), 0);
+    const attendanceRate = total > 0 ? Math.min(Math.round((workedToday / total) * 100), 100) : 0;
+
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statPresent').textContent = inOfficeNow;
+    document.getElementById('statLate').textContent = late;
+    document.getElementById('statAbsent').textContent = absent;
+    document.getElementById('attendanceRate').textContent = attendanceRate + '%';
+
+    const bars = document.getElementById('progressBars');
+    const barItems = [
+      { l: 'Были сегодня', v: workedToday, c: 'var(--primary)' },
+      { l: 'Сейчас в офисе', v: inOfficeNow, c: 'var(--accent)' },
+      { l: 'Опоздали', v: late, c: 'var(--warning)' },
+      { l: 'Не пришли', v: absent, c: 'var(--error)' },
+      { l: 'Разреш. отсутствие', v: approvedAbsence, c: '#5C6BC0' },
+      { l: 'Завершили день', v: completed, c: '#1A73E8' },
+      { l: 'Не завершили', v: incomplete, c: '#7B61FF' },
+    ];
+    bars.innerHTML = barItems.map(({ l, v, c }) => `
+      <div class="progress-bar-wrap">
+        <span class="progress-label">${l}</span>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${total > 0 ? Math.round((v / total) * 100) : 0}%;background:${c}"></div>
+        </div>
+        <span class="progress-val" style="color:${c}">${v}</span>
+      </div>
+    `).join('');
+
+    const latest = document.getElementById('latestRecords');
+    const detail = (report.detail || []).slice(0, 5);
+
+    if (!detail.length) {
+      latest.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px">Нет данных за сегодня</p>';
+      return;
+    }
+
+    latest.innerHTML = detail.map(r => `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:700; font-size:14px">${r.full_name}</div>
+          <div style="font-size:12px; color:var(--text-sub)">
+            ${r.department || '—'} • ${r.check_in_time || '—'} → ${r.check_out_time || '—'}
+          </div>
+        </div>
+        ${statusBadge(r.status)}
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    showToast('Ошибка загрузки дашборда: ' + e.message, 'error');
+  }
+}
+// =========== EMPLOYEES ===========
+async function loadEmployees() {
+  try {
+    const includeInactive = document.getElementById('showInactiveEmployees')?.checked ? 'true' : 'false';
+    allEmployees = await apiFetch(`/employees?include_inactive=${includeInactive}`) || [];
+    renderEmployees(allEmployees);
+  } catch (e) {
+    document.getElementById('employeesTable').innerHTML =
+      `<tr><td colspan="6" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${e.message}</td></tr>`;
+  }
+}
+function renderEmployees(list) {
+  const tbody = document.getElementById('employeesTable');
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет сотрудников</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(e => `
+    <tr>
+      <td>
+        <div style="display:flex; align-items:center; gap:12px">
+          <div style="width:36px;height:36px;background:rgba(26,115,232,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--primary)">
+            ${(e.full_name || '?')[0].toUpperCase()}
+          </div>
+          <div>
+            <div style="font-weight:700">${e.full_name || '—'}</div>
+            <div style="font-size:12px; color:var(--text-sub)">${e.email || '—'}</div>
+          </div>
+        </div>
+      </td>
+      <td>${e.department || '—'}</td>
+      <td>${e.position || '—'}</td>
+      <td style="color:var(--text-sub)">${e.email || '—'}</td>
+      <td>
+        ${e.is_active
+          ? '<span class="badge badge-active">Активен</span>'
+          : '<span class="badge badge-inactive">Неактивен</span>'}
+      </td>
+      <td style="display:flex; gap:8px; flex-wrap:wrap">
+        ${e.is_active
+          ? `<button class="btn btn-ghost btn-sm" onclick="deactivateEmployee(${e.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+          : `<button class="btn btn-ghost btn-sm" onclick="activateEmployee(${e.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
+        <button class="btn btn-danger btn-sm" onclick="deleteEmployee(${e.id})">Удалить</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+
+function filterEmployees() {
+  const search = document.getElementById('empSearch').value.toLowerCase();
+  const dept = document.getElementById('empDeptFilter').value.toLowerCase();
+
+  renderEmployees(
+    allEmployees.filter(e =>
+      (!search || (e.full_name || '').toLowerCase().includes(search) || (e.email || '').toLowerCase().includes(search)) &&
+      (!dept || (e.department || '').toLowerCase().includes(dept))
+    )
+  );
+}
+
+async function createEmployee() {
+  try {
+    await apiFetch('/employees', {method:'POST', body: JSON.stringify({
+      full_name: document.getElementById('empFullName').value,
+      email: document.getElementById('empEmail').value,
+      phone: document.getElementById('empPhone').value || null,
+      department: document.getElementById('empDept').value || null,
+      position: document.getElementById('empPos').value || null,
+      username: document.getElementById('empUsername').value,
+      password: document.getElementById('empPassword').value,
+    })});
+    closeModal('addEmployee');
+    showToast('Сотрудник создан', 'success');
+    loadEmployees();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function activateEmployee(id) {
+  try {
+    await apiFetch(`/employees/${id}/activate`, { method: 'PATCH' });
+    showToast('Сотрудник активирован', 'success');
+    loadEmployees();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deleteEmployee(id) {
+  if (!confirm('Полностью удалить сотрудника? Если у него есть история, backend не даст удалить.')) return;
+  try {
+    await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+    showToast('Сотрудник удалён', 'success');
+    loadEmployees();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deactivateEmployee(id) {
+  if (!confirm('Деактивировать сотрудника?')) return;
+  try {
+    await apiFetch(`/employees/${id}/deactivate`, { method: 'PATCH' });
+    showToast('Сотрудник деактивирован', 'success');
+    loadEmployees();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// =========== ATTENDANCE ===========
+function setDefaultDates() {
+  const today = new Date().toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now()-7*86400000).toISOString().split('T')[0];
+  document.getElementById('attStartDate').value = weekAgo;
+  document.getElementById('attEndDate').value = today;
+}
+
+async function loadAttendance() {
+  const s = document.getElementById('attStartDate').value;
+  const e = document.getElementById('attEndDate').value;
+  const id = document.getElementById('attEmpId').value;
+  let url = '/attendance?';
+  if (s) url += `start_date=${s}&`;
+  if (e) url += `end_date=${e}&`;
+  if (id) url += `employee_id=${id}&`;
+  try {
+    const records = await apiFetch(url) || [];
+    renderAttendance(records);
+  } catch(err) {
+document.getElementById('attendanceTable').innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${err.message}</td></tr>`;  }
+}
+
+function renderAttendance(list) {
+  const tbody = document.getElementById('attendanceTable');
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:32px">Нет записей</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td style="font-weight:700">${r.date || '—'}</td>
+      <td>
+        <div style="font-weight:700">${r.employee_name || '—'}</div>
+        <div style="font-size:12px; color:var(--text-sub)">ID: ${r.employee_id}</div>
+      </td>
+      <td style="color:var(--accent); font-weight:700">${r.formatted_check_in || '—'}</td>
+      <td style="color:var(--error); font-weight:700">${r.formatted_check_out || '—'}</td>
+      <td>${r.work_duration || '—'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${r.late_minutes > 0 ? `<span style="color:var(--warning); font-weight:700">${r.late_minutes} мин</span>` : '—'}</td>
+      <td>${r.early_arrival_minutes > 0 ? `<span style="color:var(--accent); font-weight:700">${r.early_arrival_minutes} мин</span>` : '—'}</td>
+      <td>${r.early_leave_minutes > 0 ? `<span style="color:var(--error); font-weight:700">${r.early_leave_minutes} мин</span>` : '—'}</td>
+      <td>${r.overtime_minutes > 0 ? `<span style="color:var(--primary); font-weight:700">${r.overtime_minutes} мин</span>` : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function resetAttFilters() {
+  setDefaultDates();
+  document.getElementById('attEmpId').value = '';
+  loadAttendance();
+}
+
+// =========== REQUESTS ===========
+const requestTypeLabelMap = {
+  sick: 'Больничный',
+  family: 'Семейные обстоятельства',
+  vacation: 'Отпуск',
+  business_trip: 'Командировка',
+  remote_work: 'Удалённая работа',
+  late_reason: 'Опоздание (по причине)',
+  early_leave: 'Ранний уход (по причине)',
+  other: 'Другое'
+};
+
+const requestStatusLabelMap = {
+  new: 'Новая',
+  reviewing: 'Рассматривается',
+  approved: 'Одобрена',
+  rejected: 'Отклонена',
+  needs_clarification: 'Нужно уточнение'
+};
+
+async function loadRequests() {
+  const status = document.getElementById('reqStatus')?.value || '';
+  const employeeId = document.getElementById('reqEmpId')?.value || '';
+  const requestType = document.getElementById('reqType')?.value || '';
+  let url = '/absence-requests?';
+  if (status) url += `status=${encodeURIComponent(status)}&`;
+  if (employeeId) url += `employee_id=${encodeURIComponent(employeeId)}&`;
+  if (requestType) url += `request_type=${encodeURIComponent(requestType)}&`;
+
+  try {
+    const rows = await apiFetch(url) || [];
+    renderRequests(rows);
+    await loadRequestsBadge();
+  } catch (e) {
+    document.getElementById('requestsTable').innerHTML =
+      `<tr><td colspan="8" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${e.message}</td></tr>`;
+  }
+}
+
+function renderRequests(list) {
+  const tbody = document.getElementById('requestsTable');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:32px">Нет заявок</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => {
+    const period = r.end_date ? `${r.start_date} — ${r.end_date}` : r.start_date;
+    const typeLabel = requestTypeLabelMap[r.request_type] || r.request_type;
+    const statusLabel = requestStatusLabelMap[r.status] || r.status;
+    const isResolved = ['approved', 'rejected', 'needs_clarification'].includes(r.status);
+    return `
+      <tr>
+        <td style="font-weight:700">#${r.id}</td>
+        <td>${r.employee_id}</td>
+        <td>${typeLabel}</td>
+        <td>${period}${r.start_time ? `<div style="font-size:12px;color:var(--text-sub)">в ${String(r.start_time).slice(0,5)}</div>` : ''}</td>
+        <td style="max-width:260px; white-space:normal">${r.comment_employee || '—'}</td>
+        <td>${statusBadgeForRequest(r.status, statusLabel)}</td>
+        <td style="max-width:220px; white-space:normal">${r.comment_admin || '—'}</td>
+        <td style="display:flex; gap:6px; flex-wrap:wrap">
+          ${isResolved ? '<span style="font-size:12px; color:var(--text-sub)">Завершено</span>' : `
+            <button class="btn btn-ghost btn-sm" style="color:var(--accent); border-color:var(--accent)" onclick="reviewRequest(${r.id}, 'approved')">Одобрить</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--error); border-color:var(--error)" onclick="reviewRequest(${r.id}, 'rejected')">Отклонить</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--warning); border-color:var(--warning)" onclick="reviewRequest(${r.id}, 'needs_clarification')">Уточнить</button>
+          `}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function statusBadgeForRequest(status, label) {
+  const map = {
+    new: 'badge-completed',
+    reviewing: 'badge-late',
+    approved: 'badge-present',
+    rejected: 'badge-absent',
+    needs_clarification: 'badge-approved-absence'
+  };
+  const cls = map[status] || 'badge-manual';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+async function reviewRequest(requestId, status) {
+  let comment = prompt('Комментарий администратора (необязательно):') || '';
+  if (status === 'needs_clarification' && !comment.trim()) {
+    showToast('Для статуса "нужно уточнение" добавьте комментарий', 'error');
+    return;
+  }
+  try {
+    await apiFetch(`/absence-requests/${requestId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        comment_admin: comment.trim() || null
+      })
+    });
+    showToast('Заявка обновлена', 'success');
+    await loadRequests();
+    loadDashboard();
+    if (typeof loadAttendance === 'function') loadAttendance();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function resetRequestFilters() {
+  document.getElementById('reqStatus').value = '';
+  document.getElementById('reqEmpId').value = '';
+  document.getElementById('reqType').value = '';
+  loadRequests();
+}
+
+async function loadRequestsBadge() {
+  try {
+    const requests = await apiFetch('/absence-requests?status=new');
+    const count = Array.isArray(requests) ? requests.length : 0;
+    const badge = document.getElementById('requestsBadge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.style.display = 'inline-block';
+      badge.textContent = count;
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (_) {
+    // Ignore badge errors
+  }
+}
+
+
+
+// =========== NETWORKS ===========
+async function loadNetworks() {
+  try {
+    const nets = await apiFetch('/office-networks') || [];
+    const tbody = document.getElementById('networksTable');
+
+    if (!nets.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет сетей</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = nets.map(n => `
+      <tr>
+        <td style="font-weight:700">${n.name}</td>
+        <td style="font-family:monospace">${n.public_ip || '—'}</td>
+        <td style="font-family:monospace">${n.ip_range || '—'}</td>
+        <td style="color:var(--text-sub)">${n.description || '—'}</td>
+        <td>
+          ${n.is_active
+            ? '<span class="badge badge-active">Активна</span>'
+            : '<span class="badge badge-inactive">Неактивна</span>'}
+        </td>
+        <td style="display:flex; gap:8px; flex-wrap:wrap">
+          ${n.is_active
+            ? `<button class="btn btn-ghost btn-sm" onclick="deactivateNetwork(${n.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="activateNetwork(${n.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
+          <button class="btn btn-danger btn-sm" onclick="deleteNetwork(${n.id})">Удалить</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function createNetwork() {
+  try {
+    await apiFetch('/office-networks', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('netName').value,
+        public_ip: document.getElementById('netIp').value || null,
+        ip_range: document.getElementById('netRange').value || null,
+        description: document.getElementById('netDesc').value || null
+      })
+    });
+
+    closeModal('addNetwork');
+    showToast('Сеть добавлена', 'success');
+    loadNetworks();
+
+    document.getElementById('netName').value = '';
+    document.getElementById('netIp').value = '';
+    document.getElementById('netRange').value = '';
+    document.getElementById('netDesc').value = '';
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function activateNetwork(id) {
+  try {
+    await apiFetch(`/office-networks/${id}/activate`, { method: 'PATCH' });
+    showToast('Сеть активирована', 'success');
+    loadNetworks();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deactivateNetwork(id) {
+  try {
+    await apiFetch(`/office-networks/${id}/deactivate`, { method: 'PATCH' });
+    showToast('Сеть деактивирована', 'success');
+    loadNetworks();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deleteNetwork(id) {
+  if (!confirm('Удалить сеть?')) return;
+  try {
+    await apiFetch(`/office-networks/${id}`, { method: 'DELETE' });
+    showToast('Сеть удалена', 'success');
+    loadNetworks();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// =========== QR ===========
+async function loadCurrentQR() {
+  try {
+    const data = await apiFetch('/qr/current');
+    document.getElementById('qrContainer').innerHTML = `
+      <img src="data:image/png;base64,${data.image_base64}" width="200" height="200" alt="QR Code">
+      <p style="margin-top:16px; font-size:13px; color:var(--text-sub)">Тип: ${data.type}</p>
+      <p style="font-size:11px; font-family:monospace; margin-top:8px; color:var(--text-muted); word-break:break-all">${data.token}</p>
+    `;
+  } catch(e) {
+    document.getElementById('qrContainer').innerHTML = `<p style="color:var(--error)">${e.message}</p>`;
+  }
+}
+
+async function generateNewQR() {
+  if (!confirm('Сгенерировать новый QR-код? Старый перестанет быть активным.')) return;
+  try {
+    await apiFetch('/qr/generate', { method: 'POST' });
+    await loadCurrentQR();
+    await loadQrHistory();
+    showToast('Новый QR-код сгенерирован', 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function loadQrHistory() {
+  try {
+    const list = await apiFetch('/qr') || [];
+    const tbody = document.getElementById('qrHistoryTable');
+
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет QR-кодов</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list.map(q => `
+      <tr>
+        <td>${q.id}</td>
+        <td>${q.type || 'attendance'}</td>
+        <td>${q.created_at ? new Date(q.created_at).toLocaleString('ru-RU') : '—'}</td>
+        <td>${q.expires_at ? new Date(q.expires_at).toLocaleString('ru-RU') : '—'}</td>
+        <td>
+          ${q.is_active
+            ? '<span class="badge badge-active">Активен</span>'
+            : '<span class="badge badge-inactive">Неактивен</span>'}
+        </td>
+        <td style="display:flex; gap:8px; flex-wrap:wrap">
+          ${q.is_active
+            ? `<button class="btn btn-ghost btn-sm" onclick="deactivateQr(${q.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+            : `<button class="btn btn-ghost btn-sm" onclick="activateQr(${q.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
+          <button class="btn btn-danger btn-sm" onclick="deleteQr(${q.id})">Удалить</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function activateQr(id) {
+  try {
+    await apiFetch(`/qr/${id}/activate`, { method: 'PATCH' });
+    showToast('QR активирован', 'success');
+    loadCurrentQR();
+    loadQrHistory();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deactivateQr(id) {
+  try {
+    await apiFetch(`/qr/${id}/deactivate`, { method: 'PATCH' });
+    showToast('QR деактивирован', 'success');
+    loadCurrentQR();
+    loadQrHistory();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function deleteQr(id) {
+  if (!confirm('Удалить QR?')) return;
+  try {
+    await apiFetch(`/qr/${id}`, { method: 'DELETE' });
+    showToast('QR удалён', 'success');
+    loadCurrentQR();
+    loadQrHistory();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+
+// =========== REPORTS ===========
+function switchReportTab(type, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (type==='daily') loadDailyReport();
+  else loadMonthlyReport();
+}
+
+async function loadDailyReport() {
+  const today = new Date().toISOString().split('T')[0];
+  try {
+    const r = await apiFetch(`/reports/daily?report_date=${today}`);
+    const s = r.summary;
+    document.getElementById('reportContent').innerHTML = `
+      <div class="stats-grid">
+        ${[
+          ['Всего', s.total_employees, 'var(--primary)'],
+          ['Присутствуют', s.present, 'var(--accent)'],
+          ['Опоздали', s.late, 'var(--warning)'],
+          ['Отсутствуют', s.absent, 'var(--error)'],
+        ].map(([l,v,c]) => `
+          <div class="stat-card">
+            <div class="stat-value" style="color:${c}">${v}</div>
+            <div class="stat-label">${l}</div>
+          </div>`).join('')}
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Детали за ${today}</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Приход</th><th>Уход</th><th>Статус</th><th>Опоздание</th></tr></thead>
+            <tbody>${r.detail.map(d => `
+              <tr>
+                <td style="font-weight:700">${d.full_name}</td>
+                <td>${d.department||'—'}</td>
+                <td style="color:var(--accent)">${d.check_in_time||'—'}</td>
+                <td style="color:var(--error)">${d.check_out_time||'—'}</td>
+                <td>${statusBadge(d.status)}</td>
+                <td>${d.late_minutes>0 ? `<span style="color:var(--warning)">${d.late_minutes} мин</span>` : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadMonthlyReport() {
+  const now = new Date();
+  try {
+    const r = await apiFetch(`/reports/monthly?year=${now.getFullYear()}&month=${now.getMonth()+1}`);
+    document.getElementById('reportContent').innerHTML = `
+      <div class="card">
+        <div class="card-header"><div class="card-title">Месячный отчёт — ${r.period}</div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Дней присут.</th><th>Опоздал (дней)</th><th>Итого опозд. (мин)</th></tr></thead>
+            <tbody>${r.employees.map(e => `
+              <tr>
+                <td style="font-weight:700">${e.full_name}</td>
+                <td>${e.department||'—'}</td>
+                <td style="color:var(--accent); font-weight:700">${e.days_present}</td>
+                <td style="color:var(--warning)">${e.days_late}</td>
+                <td>${e.total_late_minutes>0 ? `<span style="color:var(--warning)">${e.total_late_minutes} мин</span>` : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+
+
+
+
+
+// =========== HELPERS ===========
+function statusBadge(s) {
+  const map = {
+    present: ['badge-present', '✅ В офисе'],
+    late: ['badge-late', '⚠️ Опоздание'],
+    absent: ['badge-absent', '❌ Не пришёл'],
+    incomplete: ['badge-incomplete', '🕒 Не завершил день'],
+    completed: ['badge-completed', '✔️ Завершён'],
+    manual: ['badge-manual', '✏️ Вручную'],
+    approved_absence: ['badge-approved-absence', '✓ Разрешённое отсутствие'],
+  };
+
+  const [cls, lbl] = map[s] || ['badge-absent', s];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function openModal(name) {
+  document.getElementById('modal-'+name).classList.add('open');
+}
+
+function closeModal(name) {
+  document.getElementById('modal-'+name).classList.remove('open');
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = (type==='success'?'✅ ':'❌ ') + msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Close modal on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); });
+});
+
+// Enter key on login
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+  if (e.key==='Enter') doLogin();
+});
+
+// Init
+if (accessToken) {
+  document.getElementById('loginPage').style.display = 'none';
+  initApp();
+}
+</script>
+</body>
+</html>
