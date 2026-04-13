@@ -1,55 +1,223 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models.user import User
-from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, UserResponse
-from app.utils.security import verify_password, create_access_token, create_refresh_token, decode_token
+from app.models.user import User, UserRole, UserStatus
+from app.schemas.auth import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserMeResponse,
+)
 from app.utils.dependencies import get_current_user
+from app.utils.redis_client import (
+    blacklist_token,
+    clear_failed_attempts,
+    is_login_blocked,
+    is_token_blacklisted,
+    record_failed_attempt,
+)
+from app.utils.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_password_hash,
+    token_ttl_seconds,
+    verify_password,
+)
 
 router = APIRouter(prefix="/auth", tags=["Аутентификация"])
 
+_MENTOR_ROLES = (UserRole.TEAM_LEAD, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+
+
+@router.get("/register/mentors")
+def list_register_mentors(db: Session = Depends(get_db)):
+    """Публичный список менторов для регистрации стажёра (без авторизации)."""
+    users = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.in_(_MENTOR_ROLES),
+        )
+        .order_by(User.full_name)
+        .all()
+    )
+    return [{"id": str(u.id), "full_name": u.full_name, "role": u.role.value} for u in users]
+
+
+# ── POST /register ─────────────────────────────────────────────────────────────
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    """
+    Self-registration. Account is created with status PENDING.
+    Admin must approve before the user can log in.
+    """
+    # Uniqueness checks — 409 Conflict
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Email уже зарегистрирован")
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Логин уже занят")
+    if db.query(User).filter(User.phone == data.phone).first():
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Телефон уже зарегистрирован")
+
+    mentor_id = None
+    if data.role == UserRole.INTERN and data.mentor_id:
+        mentor = (
+            db.query(User)
+            .filter(
+                User.id == data.mentor_id,
+                User.deleted_at.is_(None),
+                User.status == UserStatus.ACTIVE,
+                User.role.in_(_MENTOR_ROLES),
+            )
+            .first()
+        )
+        if not mentor:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                detail="Выберите ментора из списка (активный сотрудник с ролью ментора или администратор)",
+            )
+        mentor_id = data.mentor_id
+
+    user = User(
+        full_name=data.full_name,
+        email=data.email,
+        phone=data.phone,
+        username=data.username,
+        password_hash=get_password_hash(data.password),
+        role=data.role,
+        status=UserStatus.PENDING,
+        hired_at=date.today(),
+        mentor_id=mentor_id,
+    )
+    db.add(user)
+    db.commit()
+
+    # TODO: push notification to admin
+
+    return {"message": "Заявка отправлена. Ожидайте подтверждения администратором."}
+
+
+# ── POST /login ────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Login with username (or email) + password.
+    Brute-force protection: 5 failed attempts → 15-minute block.
+    """
+    username_key = data.username.lower()
+
+    if is_login_blocked(username_key):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много неудачных попыток. Попробуйте через 15 минут.",
+        )
+
+    user: Optional[User] = db.query(User).filter(
         (User.username == data.username) | (User.email == data.username)
     ).first()
 
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный логин или пароль")
+        count = record_failed_attempt(username_key)
+        remaining = max(0, 5 - count)
+        detail = f"Неверный логин или пароль."
+        if remaining > 0:
+            detail += f" Осталось попыток: {remaining}."
+        else:
+            detail = "Слишком много неудачных попыток. Попробуйте через 15 минут."
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=detail)
 
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Аккаунт деактивирован")
+    # Status checks
+    _blocked_statuses = {
+        UserStatus.PENDING: "Аккаунт ожидает подтверждения администратором",
+        UserStatus.BLOCKED: "Аккаунт заблокирован. Обратитесь к администратору",
+        UserStatus.DELETED: "Аккаунт удалён",
+        UserStatus.LEAVE: "Аккаунт на паузе. Обратитесь к администратору",
+    }
+    if user.status in _blocked_statuses:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=_blocked_statuses[user.status])
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    # Success — clear brute-force counter
+    clear_failed_attempts(username_key)
+
+    user_id = str(user.id)
+    role = user.role.value
+
+    access_token, _ = create_access_token(user_id, role)
+    refresh_token, _ = create_refresh_token(user_id, role)
+
     return TokenResponse(
-        access_token=create_access_token(token_data),
-        refresh_token=create_refresh_token(token_data)
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserMeResponse.model_validate(user),
     )
 
+
+# ── POST /refresh ──────────────────────────────────────────────────────────────
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_token(data: RefreshRequest, db: Session = Depends(get_db)):
+def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+    """
+    Exchange a refresh token for a new access + refresh token pair.
+    Old refresh token is blacklisted (rotation).
+    """
     payload = decode_token(data.refresh_token)
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Недействительный refresh token")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Недействительный refresh token")
 
-    user = db.query(User).filter(User.id == int(payload["sub"])).first()
-    if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден")
+    jti = payload.get("jti", "")
+    if is_token_blacklisted(jti):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Refresh token отозван")
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    user_id = payload.get("sub")
+    user: Optional[User] = db.query(User).filter(User.id == user_id).first()
+    if not user or user.status not in (UserStatus.ACTIVE, UserStatus.WARNING):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден или неактивен")
+
+    # Rotate: blacklist old refresh token
+    blacklist_token(jti, token_ttl_seconds(payload))
+
+    role = user.role.value
+    uid = str(user.id)
+    new_access, _ = create_access_token(uid, role)
+    new_refresh, _ = create_refresh_token(uid, role)
+
     return TokenResponse(
-        access_token=create_access_token(token_data),
-        refresh_token=create_refresh_token(token_data)
+        access_token=new_access,
+        refresh_token=new_refresh,
+        user=UserMeResponse.model_validate(user),
     )
 
 
-@router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+# ── POST /logout ───────────────────────────────────────────────────────────────
 
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(
+    data: LogoutRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Invalidate the refresh token. The access token expires naturally (15 min).
+    """
+    payload = decode_token(data.refresh_token)
+    if payload and payload.get("sub") == str(current_user.id):
+        jti = payload.get("jti", "")
+        blacklist_token(jti, token_ttl_seconds(payload))
 
-@router.post("/logout")
-def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Выход выполнен успешно"}
+
+
+# ── GET /me ────────────────────────────────────────────────────────────────────
+
+@router.get("/me", response_model=UserMeResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return current_user

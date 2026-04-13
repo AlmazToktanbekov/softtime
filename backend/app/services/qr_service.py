@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.models.office_network import QRToken
 
 
-def validate_qr_token(token: str, db: Session) -> Tuple[bool, str]:
-    """Validate QR token. Returns (is_valid, message)."""
+def validate_qr_token(token: str, db: Session, expected_type: Optional[str] = None) -> Tuple[bool, str]:
+    """Validate QR token. Returns (is_valid, message).
+    If expected_type is provided (e.g., 'attendance', 'duty'), token must match that type.
+    """
     qr = db.query(QRToken).filter(
         QRToken.token == token,
         QRToken.is_active == True
@@ -21,10 +23,18 @@ def validate_qr_token(token: str, db: Session) -> Tuple[bool, str]:
     if qr.expires_at and qr.expires_at < datetime.utcnow():
         return False, "QR-код просрочен"
 
+    if expected_type:
+        # Legacy tokens created as "static" are valid for office attendance check-in/out.
+        effective = qr.type
+        if expected_type == "attendance" and effective == "static":
+            effective = "attendance"
+        if effective != expected_type:
+            return False, f"QR-код неверного типа: ожидается {expected_type}, получено {qr.type}"
+
     return True, "OK"
 
 
-def generate_qr_token(db: Session, token_type: str = "static") -> QRToken:
+def generate_qr_token(db: Session, token_type: str = "attendance") -> QRToken:
     """Generate a new QR token."""
     token = secrets.token_urlsafe(32)
     qr_token = QRToken(token=token, type=token_type, is_active=True)

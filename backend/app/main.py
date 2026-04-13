@@ -1,22 +1,65 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from app.config import settings
 from app.database import engine, Base
-from app import models  # noqa - ensure all models are imported
-from app.routers import auth, employees, attendance, reports
+from app import models  # noqa — ensure all models are imported for create_all
+from app.routers import auth, attendance, reports
+from app.routers.users import router as users_router
+from app.routers.teams import router as teams_router
 from app.routers.office_networks import networks_router, qr_router
 from app.routers.settings import router as settings_router
 from app.routers.absence_requests import router as absence_requests_router
+from app.routers.duty import router as duty_router
+from app.routers.news import router as news_router
+from app.routers.tasks import router as tasks_router
+from app.routers.employee_schedules import router as employee_schedules_router
+from app.routers.audit_logs import router as audit_logs_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ────────────────────────────────────────────────────────────────
+    if settings.AUTO_CREATE_TABLES:
+        Base.metadata.create_all(bind=engine)
+
+    from app.database import ensure_users_team_schema
+    ensure_users_team_schema(engine)
+
+    from app.database import SessionLocal
+    from app.bootstrap import ensure_default_data
+    db = SessionLocal()
+    try:
+        ensure_default_data(db)
+    finally:
+        db.close()
+
+    from app.services.cron_service import setup_scheduler
+    scheduler = setup_scheduler()
+    scheduler.start()
+    app.state.scheduler = scheduler
+
+    yield
+
+    # ── Shutdown ───────────────────────────────────────────────────────────────
+    scheduler = getattr(app.state, "scheduler", None)
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Система учета посещаемости сотрудников — REST API",
+    description="SoftTime — система управления офисом и командой",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -25,22 +68,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
 prefix = settings.API_V1_STR
-app.include_router(settings_router, prefix=prefix)
 app.include_router(auth.router, prefix=prefix)
-app.include_router(employees.router, prefix=prefix)
+app.include_router(users_router, prefix=prefix)
+app.include_router(teams_router, prefix=prefix)
 app.include_router(attendance.router, prefix=prefix)
 app.include_router(networks_router, prefix=prefix)
 app.include_router(qr_router, prefix=prefix)
 app.include_router(reports.router, prefix=prefix)
 app.include_router(absence_requests_router, prefix=prefix)
+app.include_router(duty_router, prefix=prefix)
+app.include_router(news_router, prefix=prefix)
+app.include_router(tasks_router, prefix=prefix)
+app.include_router(employee_schedules_router, prefix=prefix)
+app.include_router(audit_logs_router, prefix=prefix)
+app.include_router(settings_router, prefix=prefix)
 
-
-@app.on_event("startup")
-def on_startup():
-    if settings.AUTO_CREATE_TABLES:
-        Base.metadata.create_all(bind=engine)
+# Serve uploaded files (avatars, etc.)
+_uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
 @app.get("/")
@@ -49,7 +96,7 @@ def root():
         "name": settings.APP_NAME,
         "version": "1.0.0",
         "status": "running",
-        "docs": "/docs"
+        "docs": "/docs",
     }
 
 

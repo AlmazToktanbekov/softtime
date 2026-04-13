@@ -1,22 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
+# Employee model has been merged into User (app/models/user.py).
+# This file is kept temporarily to avoid import errors in routers that haven't been updated yet.
+from app.models.user import User, UserRole, UserStatus
 
-
-class Employee(Base):
-    __tablename__ = "employees"
-
-    id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(255), nullable=False)
-    phone = Column(String(50), nullable=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    department = Column(String(100), nullable=True)
-    position = Column(String(100), nullable=True)
-    hire_date = Column(Date, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    attendances = relationship("Attendance", back_populates="employee")
-    logs = relationship("AttendanceLog", back_populates="employee")
+# Aliases for backward compatibility during router migration
+Employee = User
+EmployeeStatus = UserStatus

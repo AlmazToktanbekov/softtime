@@ -1,59 +1,64 @@
-# 📊 Attendance Tracking System
+# SoftTime — Система управления офисом (Softjol)
 
-Система учета посещаемости сотрудников на базе Flutter + FastAPI.
+Корпоративная система учёта посещаемости, дежурств, новостей и расписаний сотрудников.
 
----
+## Стек
 
-## 🚀 Быстрый старт
+| Слой | Технология |
+|------|-----------|
+| Backend | FastAPI + SQLAlchemy + PostgreSQL + Redis + Alembic |
+| Mobile | Flutter (Dart) |
+| Admin Web | Статический SPA (HTML/CSS/JS) |
+| Deploy | Docker Compose + Nginx |
+| Push | FCM (Firebase Cloud Messaging) |
 
-### 1. Запуск backend с Docker
+## Структура проекта
 
-```bash
-cd attendance_system
-docker-compose up --build
+```
+softtime/
+├── backend/          # FastAPI REST API
+├── flutter_app/      # Flutter мобильное приложение
+├── admin_web/        # Веб-панель администратора
+├── docs/             # Документация и ТЗ
+├── nginx/            # Конфигурация Nginx
+├── pictures/         # Логотипы и фирменные материалы
+├── docker-compose.yml
+└── .env.example
 ```
 
-Backend будет доступен на: `http://localhost:8000`
-Swagger документация: `http://localhost:8000/docs`
+## Быстрый старт
 
-### 1.1. Локальный запуск backend (без Docker)
-
-Если вы хотите запускать backend напрямую на машине:
+### 1. Настройка переменных окружения
 
 ```bash
-cd backend
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-
-# Пример для локального Postgres:
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/attendance_db"
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env
+# Отредактируйте .env — смените пароли и секреты
 ```
 
-> По умолчанию таблицы создаются автоматически при старте (`AUTO_CREATE_TABLES=true`).
+**Обязательно смените в `.env`:**
+- `POSTGRES_PASSWORD`
+- `SECRET_KEY` — генерировать: `python3 -c "import secrets; print(secrets.token_hex(32))"`
+- `DEFAULT_ADMIN_PASSWORD`
 
-### 2. Инициализация данных
-
-После запуска контейнеров:
+### 2. Запуск через Docker Compose
 
 ```bash
-docker-compose exec backend python seed.py
+docker compose up -d
 ```
 
-Создаст:
-- Администратор: `admin` / `admin123`
-- Сотрудники: `ivan.ivanov` / `pass123`, `maria.petrova` / `pass123`
-- Офисную сеть (localhost + 192.168.1.0/24)
-- Активный QR-токен
+Сервисы:
+- **Backend API**: http://localhost:8000
+- **Swagger UI**: http://localhost:8000/docs
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
 
-### 3. Веб-панель администратора
+### 3. Применение миграций
 
-Откройте `admin_web/index.html` в браузере (или настройте Nginx для раздачи).
+```bash
+docker compose exec backend alembic upgrade head
+```
 
-Войдите с `admin` / `admin123`
-
-### 4. Flutter приложение
+### 4. Запуск Flutter приложения
 
 ```bash
 cd flutter_app
@@ -61,165 +66,86 @@ flutter pub get
 flutter run
 ```
 
-> Измените `lib/config/app_config.dart` → `baseUrl` под ваш сервер.
+### 5. Admin Web панель
+
+Открыть `admin_web/index.html` в браузере или настроить Nginx для раздачи.
 
 ---
 
-## 🏗️ Структура проекта
+## Роли пользователей
 
-```
-attendance_system/
-├── backend/               # FastAPI backend
-│   ├── app/
-│   │   ├── main.py        # Точка входа
-│   │   ├── config.py      # Настройки
-│   │   ├── database.py    # База данных
-│   │   ├── models/        # SQLAlchemy модели
-│   │   ├── schemas/       # Pydantic схемы
-│   │   ├── routers/       # API роутеры
-│   │   ├── services/      # Бизнес-логика
-│   │   └── utils/         # Утилиты
-│   ├── seed.py            # Начальные данные
-│   ├── Dockerfile
-│   └── requirements.txt
-│
-├── flutter_app/           # Flutter мобильное приложение
-│   ├── lib/
-│   │   ├── main.dart
-│   │   ├── config/        # Настройки (URL API)
-│   │   ├── models/        # Модели данных
-│   │   ├── services/      # API сервис + провайдеры
-│   │   ├── screens/       # Экраны приложения
-│   │   ├── widgets/       # Компоненты UI
-│   │   └── theme/         # Тема и стили
-│   └── pubspec.yaml
-│
-├── admin_web/             # Веб-панель администратора
-│   └── index.html         # Single-page admin panel
-│
-├── nginx/
-│   └── nginx.conf         # Nginx конфигурация
-│
-└── docker-compose.yml
-```
+| Роль | Описание |
+|------|---------|
+| `SUPER_ADMIN` | Полный доступ, управляет Admin-ами |
+| `ADMIN` | Управляет сотрудниками, дежурствами, расписанием |
+| `TEAM_LEAD` | Видит свою группу + отчёты группы |
+| `EMPLOYEE` | Стандартный сотрудник |
+| `INTERN` | Стажёр (те же права, что у EMPLOYEE) |
 
 ---
 
-## 📱 Экраны Flutter приложения
+## API Эндпоинты
 
-| Экран | Описание |
-|-------|----------|
-| Авторизация | Вход по логину/паролю |
-| Главный экран | Статус дня, кнопки прихода/ухода |
-| QR-сканер | Камера для сканирования QR-кода |
-| История | Список посещений с фильтром по датам |
-| Профиль | Данные сотрудника |
-| Админ-панель | Управление (для администраторов) |
+Базовый путь: `/api/v1`
 
----
+| Группа | Префикс | Описание |
+|--------|---------|---------|
+| Авторизация | `/auth` | Регистрация, вход, refresh, logout |
+| Пользователи | `/users` | CRUD, статусы, аватары, approve/reject |
+| Команды | `/teams` | Группы сотрудников |
+| Посещаемость | `/attendance` | Check-in/out, история, ручные правки |
+| Расписание | `/employee-schedules` | Индивидуальные графики |
+| Дежурства | `/duty` | Очередь, назначения, чеклист, обмены |
+| Новости | `/news` | Лента, read tracking |
+| Заявки | `/absence-requests` | Отпуска и отсутствия |
+| Отчёты | `/reports` | Аналитика посещаемости |
+| Сети | `/office-networks` | IP-сети офиса |
+| QR-коды | `/qr` | Генерация и управление QR |
+| Аудит | `/audit-logs` | Лог действий Admin |
+| Настройки | `/settings` | Глобальные параметры работы |
 
-## 🔌 API Endpoints
-
-### Аутентификация
-```
-POST /api/v1/auth/login       — Вход
-POST /api/v1/auth/refresh     — Обновление токена
-GET  /api/v1/auth/me          — Текущий пользователь
-POST /api/v1/auth/logout      — Выход
-```
-
-### Сотрудники
-```
-GET    /api/v1/employees          — Список
-POST   /api/v1/employees          — Создать
-GET    /api/v1/employees/{id}     — Карточка
-PUT    /api/v1/employees/{id}     — Обновить
-PATCH  /api/v1/employees/{id}/deactivate — Деактивировать
-```
-
-### Посещаемость
-```
-POST  /api/v1/attendance/check-in         — Отметить приход
-POST  /api/v1/attendance/check-out        — Отметить уход
-GET   /api/v1/attendance/my               — Моя история
-GET   /api/v1/attendance                  — Все записи (admin)
-PATCH /api/v1/attendance/{id}/manual-update — Ручная правка
-```
-
-### Отчеты
-```
-GET /api/v1/reports/daily     — Дневной отчет
-GET /api/v1/reports/weekly    — Недельный
-GET /api/v1/reports/monthly   — Месячный
-GET /api/v1/reports/department — По отделу
-```
+Полная документация: http://localhost:8000/docs
 
 ---
 
-## ⚙️ Конфигурация (.env)
+## Переменные окружения
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@db:5432/attendance_db
-SECRET_KEY=your-secret-key
-WORK_START_HOUR=9
-WORK_START_MINUTE=0
-GRACE_PERIOD_MINUTES=10
+| Переменная | Описание |
+|-----------|---------|
+| `POSTGRES_DB` | Имя базы данных |
+| `POSTGRES_USER` | Пользователь PostgreSQL |
+| `POSTGRES_PASSWORD` | Пароль PostgreSQL |
+| `REDIS_URL` | URL Redis (например, `redis://redis:6379`) |
+| `SECRET_KEY` | Секрет для подписи JWT |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Время жизни access token (по умолчанию: 15) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | Время жизни refresh token (по умолчанию: 30) |
+| `DEFAULT_ADMIN_USERNAME` | Логин первого Super Admin |
+| `DEFAULT_ADMIN_EMAIL` | Email первого Super Admin |
+| `DEFAULT_ADMIN_PASSWORD` | Пароль первого Super Admin |
+| `AUTO_CREATE_TABLES` | Создавать таблицы при старте (dev only) |
+| `DEBUG` | Режим отладки |
+
+---
+
+## Разработка
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Создать миграцию
+alembic revision --autogenerate -m "description"
+
+# Применить миграции
+alembic upgrade head
 ```
 
----
+### Полная документация
 
-## 🔐 Логика проверки присутствия
-
-Отметка принимается только при **одновременном** выполнении:
-1. ✅ Сотрудник авторизован (JWT токен)
-2. ✅ QR-код действителен (из базы данных)
-3. ✅ IP-адрес запроса принадлежит офисной сети
-
----
-
-## 📊 Статусы посещаемости
-
-| Статус | Описание |
-|--------|----------|
-| `present` | Пришел вовремя |
-| `late` | Опоздал (после grace period) |
-| `absent` | Не отмечен |
-| `incomplete` | Приход без ухода |
-| `completed` | Приход + уход |
-| `manual` | Скорректировано администратором |
-| `approved_absence` | Разрешённое отсутствие (админ указал причину с комментарием) |
-
----
-
-## ✓ Разрешённое отсутствие (админ)
-
-Если сотрудник не пришёл по уважительной причине, администратор может указать **разрешённое отсутствие** с комментарием (больничный, отпуск, удалёнка и т.д.):
-
-- **Веб-панель:** раздел «Посещаемость» → кнопка «Разрешённое отсутствие» → выбрать сотрудника, дату, ввести комментарий.
-- **Flutter (админ):** вкладка «Посещаемость» → FAB «Разреш. отсутствие».
-- **API:** `POST /api/v1/attendance/mark-approved-absence` (body: `employee_id`, `date`, `note`).
-
-В отчётах такие сотрудники не учитываются как «Не пришли» — отображается отдельный счётчик «Разреш. отсутствие».
-
-**Существующая БД (PostgreSQL):** если таблица `attendance` уже создана, добавьте значение enum:  
-`ALTER TYPE attendancestatus ADD VALUE IF NOT EXISTS 'approved_absence';`
-
----
-
-## 👤 Роли пользователей
-
-| Роль | Доступ |
-|------|--------|
-| `employee` | Приход/уход, своя история, профиль |
-| `admin` | Всё + управление сотрудниками, сетями, QR |
-| `manager` | Отчеты, просмотр посещаемости |
-
----
-
-## 🐳 Продакшн деплой
-
-1. Измените `SECRET_KEY` в `.env`
-2. Настройте SSL в `nginx/nginx.conf`
-3. Укажите реальные IP офиса в таблице `office_networks`
-4. Сгенерируйте QR-код через admin panel
-5. Соберите Flutter APK: `flutter build apk --release`
+- [Техническое задание v2.0](CLAUDE.md)
+- [Дизайн-спецификация](docs/design_spec.md)
+- [Оригинальное ТЗ v1.0](docs/SoftTime_TZ_v1.0.md)

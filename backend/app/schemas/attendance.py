@@ -1,15 +1,22 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime
 from typing import Optional
-from datetime import datetime, date
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict  # ConfigDict used in AttendanceResponse
+
 from app.models.attendance import AttendanceStatus
 
 
 class CheckInRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     qr_token: str
+    device_info: Optional[str] = None
 
 
 class CheckOutRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     qr_token: str
+    device_info: Optional[str] = None
 
 
 class AttendanceManualUpdate(BaseModel):
@@ -24,17 +31,16 @@ class AttendanceAdminCloseRequest(BaseModel):
 
 
 class MarkApprovedAbsenceRequest(BaseModel):
-    """Админ указывает, что сотруднику дано разрешение не прийти (с комментарием)."""
-    employee_id: int
+    user_id: UUID
     date: date
-    note: str  # Комментарий (причина): больничный, отпуск, удалёнка и т.д.
+    note: str
 
 
 class AttendanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    employee_id: int
+    id: UUID
+    user_id: UUID
     employee_name: Optional[str] = None
     date: date
 
@@ -46,7 +52,7 @@ class AttendanceResponse(BaseModel):
     work_duration: Optional[str] = None
     work_minutes: int = 0
 
-    status: AttendanceStatus
+    status: Optional[AttendanceStatus] = None
     late_minutes: int = 0
     early_arrival_minutes: int = 0
     early_leave_minutes: int = 0
@@ -64,21 +70,3 @@ class AttendanceResponse(BaseModel):
     qr_verified_out: bool = False
     office_network_id: Optional[int] = None
     note: Optional[str] = None
-
-
-class OfficeNetworkCreate(BaseModel):
-    name: str
-    public_ip: Optional[str] = None
-    ip_range: Optional[str] = None
-    description: Optional[str] = None
-
-
-class OfficeNetworkResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    public_ip: Optional[str] = None
-    ip_range: Optional[str] = None
-    description: Optional[str] = None
-    is_active: bool

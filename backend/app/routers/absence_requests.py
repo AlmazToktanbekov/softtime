@@ -1,8 +1,9 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from typing import List, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import (
@@ -11,7 +12,6 @@ from app.models import (
     AbsenceRequestType,
     Attendance,
     AttendanceStatus,
-    Employee,
     User,
 )
 from app.schemas.absence_request import (
@@ -36,41 +36,24 @@ def _apply_request_to_attendance(
     req: AbsenceRequest,
     reviewer: User,
 ) -> None:
-    """
-    При одобрении заявки обновить/создать записи посещаемости согласно ТЗ:
-    - sick            -> sick_leave
-    - vacation        -> vacation
-    - remote_work     -> remote_work
-    - business_trip   -> business_trip
-    - family/other    -> approved_absence
-    - late_reason     -> approved_late_arrival (на дату start_date)
-    - early_leave     -> approved_early_leave (на дату start_date)
-    """
-    emp = db.query(Employee).filter(
-        Employee.id == req.employee_id,
-        Employee.is_active == True,
-    ).first()
-    if not emp:
-        raise HTTPException(status_code=400, detail="Сотрудник не найден или неактивен")
+    uid = req.user_id
 
     def map_status(rt: AbsenceRequestType, *, for_single_day: bool) -> AttendanceStatus:
-        if rt == AbsenceRequestType.sick:
-            return AttendanceStatus.manual  # в расширенном enum может быть sick_leave
-        if rt == AbsenceRequestType.vacation:
-            return AttendanceStatus.manual
-        if rt == AbsenceRequestType.remote_work:
-            return AttendanceStatus.manual
-        if rt == AbsenceRequestType.business_trip:
-            return AttendanceStatus.manual
-        if rt in (AbsenceRequestType.family, AbsenceRequestType.other):
-            return AttendanceStatus.approved_absence
-        if rt == AbsenceRequestType.late_reason and for_single_day:
-            return AttendanceStatus.manual
-        if rt == AbsenceRequestType.early_leave and for_single_day:
-            return AttendanceStatus.manual
-        return AttendanceStatus.manual
+        # Все типы отсутствия с одобрением администратора → APPROVED_ABSENCE
+        if rt in (
+            AbsenceRequestType.sick,
+            AbsenceRequestType.vacation,
+            AbsenceRequestType.remote_work,
+            AbsenceRequestType.business_trip,
+            AbsenceRequestType.family,
+            AbsenceRequestType.other,
+        ):
+            return AttendanceStatus.APPROVED_ABSENCE
+        # Опоздание/ранний уход с причиной — не меняем статус дня, только добавляем примечание
+        if rt in (AbsenceRequestType.late_reason, AbsenceRequestType.early_leave) and for_single_day:
+            return AttendanceStatus.APPROVED_ABSENCE
+        return AttendanceStatus.APPROVED_ABSENCE
 
-    # Много-дневные заявки по типу “отсутствие”
     if req.request_type in {
         AbsenceRequestType.sick,
         AbsenceRequestType.family,
@@ -83,7 +66,7 @@ def _apply_request_to_attendance(
         for d in _iter_dates(req.start_date, end_date):
             record = (
                 db.query(Attendance)
-                .filter(Attendance.employee_id == req.employee_id, Attendance.date == d)
+                .filter(Attendance.user_id == uid, Attendance.date == d)
                 .first()
             )
             status = map_status(req.request_type, for_single_day=False)
@@ -92,25 +75,23 @@ def _apply_request_to_attendance(
                 record.note = req.comment_admin or req.comment_employee
             else:
                 record = Attendance(
-                    employee_id=req.employee_id,
+                    user_id=uid,
                     date=d,
                     status=status,
                     note=req.comment_admin or req.comment_employee,
                 )
                 db.add(record)
 
-    # Точечные заявки по времени (опоздание / ранний уход)
     if req.request_type in {AbsenceRequestType.late_reason, AbsenceRequestType.early_leave}:
         d = req.start_date
         record = (
             db.query(Attendance)
-            .filter(Attendance.employee_id == req.employee_id, Attendance.date == d)
+            .filter(Attendance.user_id == uid, Attendance.date == d)
             .first()
         )
         if not record:
-            # создаём минимальную запись, чтобы пометить день как одобренный
             record = Attendance(
-                employee_id=req.employee_id,
+                user_id=uid,
                 date=d,
                 status=map_status(req.request_type, for_single_day=True),
                 note=req.comment_admin or req.comment_employee,
@@ -129,12 +110,11 @@ def create_absence_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Создать заявку (только за себя)."""
-    if not current_user.employee_id:
-        raise HTTPException(status_code=400, detail="Профиль сотрудника не найден")
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="Дата окончания не может быть раньше даты начала")
 
     req = AbsenceRequest(
-        employee_id=current_user.employee_id,
+        user_id=current_user.id,
         request_type=data.request_type,
         start_date=data.start_date,
         end_date=data.end_date,
@@ -144,7 +124,12 @@ def create_absence_request(
     )
     db.add(req)
     db.commit()
-    db.refresh(req)
+    req = (
+        db.query(AbsenceRequest)
+        .options(joinedload(AbsenceRequest.user))
+        .filter(AbsenceRequest.id == req.id)
+        .first()
+    )
     return req
 
 
@@ -153,31 +138,28 @@ def list_my_absence_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Список собственных заявок."""
-    if not current_user.employee_id:
-        return []
-    q = (
+    return (
         db.query(AbsenceRequest)
-        .filter(AbsenceRequest.employee_id == current_user.employee_id)
+        .options(joinedload(AbsenceRequest.user))
+        .filter(AbsenceRequest.user_id == current_user.id)
         .order_by(AbsenceRequest.created_at.desc())
+        .all()
     )
-    return q.all()
 
 
 @router.get("", response_model=List[AbsenceRequestResponse])
 def list_absence_requests(
     status: Optional[AbsenceRequestStatus] = Query(default=None),
-    employee_id: Optional[int] = Query(default=None),
+    user_id: Optional[UUID] = Query(default=None),
     request_type: Optional[AbsenceRequestType] = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Список всех заявок (для администратора) с фильтрами."""
-    q = db.query(AbsenceRequest)
+    q = db.query(AbsenceRequest).options(joinedload(AbsenceRequest.user))
     if status is not None:
         q = q.filter(AbsenceRequest.status == status)
-    if employee_id is not None:
-        q = q.filter(AbsenceRequest.employee_id == employee_id)
+    if user_id is not None:
+        q = q.filter(AbsenceRequest.user_id == user_id)
     if request_type is not None:
         q = q.filter(AbsenceRequest.request_type == request_type)
 
@@ -186,11 +168,16 @@ def list_absence_requests(
 
 @router.get("/{request_id}", response_model=AbsenceRequestResponse)
 def get_absence_request(
-    request_id: int,
+    request_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    req = db.query(AbsenceRequest).filter(AbsenceRequest.id == request_id).first()
+    req = (
+        db.query(AbsenceRequest)
+        .options(joinedload(AbsenceRequest.user))
+        .filter(AbsenceRequest.id == request_id)
+        .first()
+    )
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     return req
@@ -198,27 +185,33 @@ def get_absence_request(
 
 @router.patch("/{request_id}/review", response_model=AbsenceRequestResponse)
 def review_absence_request(
-    request_id: int,
+    request_id: UUID,
     data: AbsenceRequestReview,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Рассмотрение заявки администратором."""
-    req = db.query(AbsenceRequest).filter(AbsenceRequest.id == request_id).first()
+    req = (
+        db.query(AbsenceRequest)
+        .options(joinedload(AbsenceRequest.user))
+        .filter(AbsenceRequest.id == request_id)
+        .first()
+    )
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
-    # Обновляем статус и комментарий администратора
     req.status = data.status
     req.comment_admin = data.comment_admin
     req.reviewed_by = current_user.id
-    req.reviewed_at = datetime.utcnow()
+    req.reviewed_at = datetime.now(timezone.utc)
 
-    # При одобрении применяем к посещаемости
     if data.status == AbsenceRequestStatus.approved:
         _apply_request_to_attendance(db, req, current_user)
 
     db.commit()
-    db.refresh(req)
+    req = (
+        db.query(AbsenceRequest)
+        .options(joinedload(AbsenceRequest.user))
+        .filter(AbsenceRequest.id == req.id)
+        .first()
+    )
     return req
-

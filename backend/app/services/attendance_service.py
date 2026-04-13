@@ -1,11 +1,14 @@
-from datetime import datetime, date, time
+from datetime import datetime, date
 from typing import Optional, Tuple
+from uuid import UUID
+
 from sqlalchemy.orm import Session
 
-from app.models.attendance import Attendance, AttendanceStatus
+from app.models.attendance import Attendance, AttendanceStatus, CheckInStatus, CheckOutStatus
 from app.models.attendance_log import AttendanceLog
-from app.models.employee import Employee
+from app.models.user import User
 from app.models.work_settings import WorkSettings
+from app.models.employee_schedule import EmployeeSchedule
 
 
 def _today() -> date:
@@ -31,24 +34,20 @@ def get_or_create_work_settings(db: Session) -> WorkSettings:
     return settings
 
 
-def _minutes_late(check_in_time: datetime, db: Session) -> int:
-    settings = get_or_create_work_settings(db)
-
-    start_hour = settings.work_start_hour
-    start_minute = settings.work_start_minute
-    grace = settings.grace_period_minutes
-
-    expected = datetime.combine(
-        check_in_time.date(),
-        time(start_hour, start_minute),
-        tzinfo=check_in_time.tzinfo
+def get_user_schedule(user_id: UUID, target_date: date, db: Session) -> Optional[EmployeeSchedule]:
+    day_of_week = target_date.weekday()
+    return (
+        db.query(EmployeeSchedule)
+        .filter(
+            EmployeeSchedule.user_id == user_id,
+            EmployeeSchedule.day_of_week == day_of_week,
+        )
+        .first()
     )
-    diff = int((check_in_time - expected).total_seconds() // 60)
-    return max(diff - grace, 0)
 
 
 def process_check_in(
-    employee: Employee,
+    user: User,
     ip_address: str,
     office_network_id: Optional[int],
     db: Session,
@@ -56,43 +55,61 @@ def process_check_in(
     today = _today()
     now = datetime.now().astimezone()
 
-    existing = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.date == today
-    ).first()
+    existing = (
+        db.query(Attendance)
+        .filter(Attendance.user_id == user.id, Attendance.date == today)
+        .first()
+    )
 
     if existing and existing.check_in_time:
         return False, "Приход уже отмечен", None
 
     if not existing:
-        record = Attendance(
-            employee_id=employee.id,
-            date=today,
-        )
+        record = Attendance(user_id=user.id, date=today)
         db.add(record)
         db.flush()
     else:
         record = existing
 
-    late_minutes = _minutes_late(now, db)
+    schedule = get_user_schedule(user.id, today, db)
+    record._schedule = schedule
+
+    late_minutes = 0
+    check_in_st = CheckInStatus.ON_TIME
+    if schedule and schedule.is_working_day and schedule.start_time:
+        expected_dt = datetime.combine(today, schedule.start_time, tzinfo=now.tzinfo)
+        diff = int((now - expected_dt).total_seconds() // 60)
+        settings = get_or_create_work_settings(db)
+        grace = settings.grace_period_minutes
+        late_minutes = max(diff - grace, 0)
+        if diff < 0:
+            check_in_st = CheckInStatus.EARLY_ARRIVAL
+        elif late_minutes > 0:
+            check_in_st = CheckInStatus.LATE
+        else:
+            check_in_st = CheckInStatus.ON_TIME
+    else:
+        late_minutes = 0
+        check_in_st = CheckInStatus.ON_TIME
 
     record.check_in_time = now
+    record.check_in_status = check_in_st
     record.check_in_ip = ip_address
     record.qr_verified_in = True
     record.office_network_id = office_network_id
     record.late_minutes = late_minutes
-    record.status = AttendanceStatus.late if late_minutes > 0 else AttendanceStatus.present
+    record.status = AttendanceStatus.LATE if late_minutes > 0 else AttendanceStatus.PRESENT
 
     db.commit()
     db.refresh(record)
 
-    log_action(employee.id, "check_in", "success", "Приход отмечен", ip_address, db)
+    log_action(user.id, "check_in", "success", "Приход отмечен", ip_address, db)
 
     return True, "Приход отмечен", record
 
 
 def process_check_out(
-    employee: Employee,
+    user: User,
     ip_address: str,
     office_network_id: Optional[int],
     db: Session,
@@ -100,10 +117,11 @@ def process_check_out(
     today = _today()
     now = datetime.now().astimezone()
 
-    record = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.date == today
-    ).first()
+    record = (
+        db.query(Attendance)
+        .filter(Attendance.user_id == user.id, Attendance.date == today)
+        .first()
+    )
 
     if not record or not record.check_in_time:
         return False, "Сначала нужно отметить приход", None
@@ -111,16 +129,42 @@ def process_check_out(
     if record.check_out_time:
         return False, "Уход уже отмечен", None
 
+    schedule = getattr(record, "_schedule", None)
+    if schedule is None:
+        schedule = get_user_schedule(user.id, today, db)
+        record._schedule = schedule
+
     record.check_out_time = now
     record.check_out_ip = ip_address
     record.qr_verified_out = True
     record.office_network_id = office_network_id
-    record.status = AttendanceStatus.completed
+
+    if record.status == AttendanceStatus.LATE:
+        final_status = AttendanceStatus.LATE
+        record.check_out_status = CheckOutStatus.ON_TIME
+    else:
+        if schedule and schedule.is_working_day and schedule.end_time:
+            expected_end = datetime.combine(today, schedule.end_time, tzinfo=now.tzinfo)
+            if now < expected_end:
+                final_status = AttendanceStatus.EARLY_LEAVE
+                record.check_out_status = CheckOutStatus.LEFT_EARLY
+            elif now > expected_end:
+                final_status = AttendanceStatus.OVERTIME
+                record.check_out_status = CheckOutStatus.OVERTIME
+            else:
+                final_status = AttendanceStatus.PRESENT
+                record.check_out_status = CheckOutStatus.ON_TIME
+        else:
+            # Расписания нет — просто фиксируем уход как обычный
+            final_status = AttendanceStatus.PRESENT
+            record.check_out_status = CheckOutStatus.ON_TIME
+
+    record.status = final_status
 
     db.commit()
     db.refresh(record)
 
-    log_action(employee.id, "check_out", "success", "Уход отмечен", ip_address, db)
+    log_action(user.id, "check_out", "success", "Уход отмечен", ip_address, db)
 
     return True, "Уход отмечен", record
 
@@ -134,7 +178,8 @@ def admin_close_attendance(
     record.check_out_time = check_out_time
     record.qr_verified_out = False
     record.check_out_ip = None
-    record.status = AttendanceStatus.manual
+    record.status = AttendanceStatus.MANUAL
+    record.check_out_status = CheckOutStatus.ON_TIME
 
     if note:
         record.note = note
@@ -148,30 +193,37 @@ def admin_close_attendance(
     return record
 
 
-def mark_incomplete_records(db: Session) -> int:
-    records = db.query(Attendance).filter(
-        Attendance.check_in_time.isnot(None),
-        Attendance.check_out_time.is_(None),
-        Attendance.status.in_([AttendanceStatus.present, AttendanceStatus.late])
-    ).all()
+def mark_incomplete_records(db: Session, target_date: Optional[date] = None) -> int:
+    if target_date is None:
+        target_date = _today()
+    records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.date == target_date,
+            Attendance.check_in_time.isnot(None),
+            Attendance.check_out_time.is_(None),
+            Attendance.status.in_([AttendanceStatus.PRESENT, AttendanceStatus.LATE]),
+        )
+        .all()
+    )
 
     for record in records:
-        record.status = AttendanceStatus.incomplete
+        record.status = AttendanceStatus.INCOMPLETE
 
     db.commit()
     return len(records)
 
 
 def log_action(
-    employee_id: int,
+    user_id: UUID,
     action: str,
     result: str,
     message: str,
     ip_address: Optional[str],
-    db: Session
+    db: Session,
 ):
     log = AttendanceLog(
-        employee_id=employee_id,
+        user_id=user_id,
         action=action,
         result=result,
         message=message,

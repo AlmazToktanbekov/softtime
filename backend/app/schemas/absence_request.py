@@ -1,5 +1,6 @@
 from datetime import date, time, datetime
 from typing import Optional, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,8 +31,9 @@ class AbsenceRequestReview(BaseModel):
 class AbsenceRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    employee_id: int
+    id: UUID
+    user_id: UUID
+    user_full_name: Optional[str] = None
     request_type: AbsenceRequestType
     start_date: date
     end_date: Optional[date] = None
@@ -39,7 +41,6 @@ class AbsenceRequestResponse(BaseModel):
     comment_employee: Optional[str] = None
     comment_admin: Optional[str] = None
     status: AbsenceRequestStatus
-    reviewed_by: Optional[int] = None
+    reviewed_by: Optional[UUID] = None
     reviewed_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
-

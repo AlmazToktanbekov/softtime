@@ -1,166 +1,78 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Enum as SQLEnum
+import uuid
+from datetime import datetime, time
+
+from sqlalchemy import Column, String, Boolean, DateTime, Date, ForeignKey, Integer, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from datetime import datetime, time
+
 from app.database import Base
 
 
 class AttendanceStatus(str, enum.Enum):
-    present = "present"
-    late = "late"
-    absent = "absent"
-    incomplete = "incomplete"
-    completed = "completed"
-    manual = "manual"
-    approved_absence = "approved_absence"  # Разрешение не прийти (с комментарием админа)
+    PRESENT = "PRESENT"
+    LATE = "LATE"
+    ABSENT = "ABSENT"
+    INCOMPLETE = "INCOMPLETE"          # no check-out by 23:00
+    APPROVED_ABSENCE = "APPROVED_ABSENCE"
+    MANUAL = "MANUAL"                  # admin-inserted record
+    EARLY_LEAVE = "EARLY_LEAVE"
+    OVERTIME = "OVERTIME"
+
+
+class CheckInStatus(str, enum.Enum):
+    ON_TIME = "ON_TIME"
+    LATE = "LATE"
+    EARLY_ARRIVAL = "EARLY_ARRIVAL"
+
+
+class CheckOutStatus(str, enum.Enum):
+    ON_TIME = "ON_TIME"
+    LEFT_EARLY = "LEFT_EARLY"
+    OVERTIME = "OVERTIME"
 
 
 class Attendance(Base):
     __tablename__ = "attendance"
 
-    id = Column(Integer, primary_key=True, index=True)
-    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
+
     check_in_time = Column(DateTime(timezone=True), nullable=True)
-    check_out_time = Column(DateTime(timezone=True), nullable=True)
-    status = Column(SQLEnum(AttendanceStatus), default=AttendanceStatus.absent)
-    late_minutes = Column(Integer, default=0)
+    check_in_status = Column(SQLEnum(CheckInStatus), nullable=True)
     check_in_ip = Column(String(45), nullable=True)
-    check_out_ip = Column(String(45), nullable=True)
     qr_verified_in = Column(Boolean, default=False)
+
+    check_out_time = Column(DateTime(timezone=True), nullable=True)
+    check_out_status = Column(SQLEnum(CheckOutStatus), nullable=True)
+    check_out_ip = Column(String(45), nullable=True)
     qr_verified_out = Column(Boolean, default=False)
+
+    late_minutes = Column(Integer, default=0)
+    status = Column(SQLEnum(AttendanceStatus), nullable=True)
     office_network_id = Column(Integer, ForeignKey("office_networks.id"), nullable=True)
     note = Column(String(500), nullable=True)
+    is_manual = Column(Boolean, default=False)        # True if admin manually added/edited
+    manual_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    employee = relationship("Employee", back_populates="attendances")
+    user = relationship("User", back_populates="attendances", foreign_keys=[user_id])
     office_network = relationship("OfficeNetwork")
+    editor = relationship("User", foreign_keys=[manual_by])
 
     @property
-    def employee_name(self):
-        return self.employee.full_name if self.employee else None
-
-    @property
-    def formatted_check_in(self):
-        if not self.check_in_time:
-            return "--:--"
-        return self.check_in_time.strftime("%H:%M")
-
-    @property
-    def formatted_check_out(self):
-        if not self.check_out_time:
-            return "--:--"
-        return self.check_out_time.strftime("%H:%M")
-
-    @property
-    def work_minutes(self):
+    def work_minutes(self) -> int:
         if not self.check_in_time or not self.check_out_time:
             return 0
-        delta = self.check_out_time - self.check_in_time
-        return max(int(delta.total_seconds() // 60), 0)
+        return max(int((self.check_out_time - self.check_in_time).total_seconds() // 60), 0)
 
     @property
     def work_duration(self):
-        minutes = self.work_minutes
-        if minutes <= 0:
+        m = self.work_minutes
+        if m <= 0:
             return None
-        hours = minutes // 60
-        mins = minutes % 60
-        return f"{hours:02d}:{mins:02d}"
-
-    def _get_work_settings(self):
-        try:
-            from app.models.work_settings import WorkSettings
-            from app.database import SessionLocal
-
-            db = SessionLocal()
-            settings = db.query(WorkSettings).first()
-            db.close()
-
-            if settings:
-                return settings
-        except Exception:
-            pass
-
-        return None
-
-    @property
-    def early_arrival_minutes(self):
-        if not self.check_in_time:
-            return 0
-
-        settings = self._get_work_settings()
-        if not settings or not settings.count_early_arrival:
-            return 0
-
-        expected_dt = datetime.combine(
-            self.date,
-            time(settings.work_start_hour, settings.work_start_minute),
-            tzinfo=self.check_in_time.tzinfo
-        )
-        diff = int((expected_dt - self.check_in_time).total_seconds() // 60)
-        return max(diff, 0)
-
-    @property
-    def early_leave_minutes(self):
-        if not self.check_out_time:
-            return 0
-
-        settings = self._get_work_settings()
-        if not settings or not settings.count_early_leave:
-            return 0
-
-        expected_dt = datetime.combine(
-            self.date,
-            time(settings.work_end_hour, settings.work_end_minute),
-            tzinfo=self.check_out_time.tzinfo
-        )
-        diff = int((expected_dt - self.check_out_time).total_seconds() // 60)
-        return max(diff, 0)
-
-    @property
-    def overtime_minutes(self):
-        if not self.check_out_time:
-            return 0
-
-        settings = self._get_work_settings()
-        if not settings or not settings.count_overtime:
-            return 0
-
-        expected_dt = datetime.combine(
-            self.date,
-            time(settings.work_end_hour, settings.work_end_minute),
-            tzinfo=self.check_out_time.tzinfo
-        )
-        diff = int((self.check_out_time - expected_dt).total_seconds() // 60)
-        return max(diff, 0)
-
-    @property
-    def underwork_minutes(self):
-        settings = self._get_work_settings()
-        if not settings or not self.check_out_time:
-            return 0
-
-        expected_minutes = (
-            (settings.work_end_hour * 60 + settings.work_end_minute)
-            - (settings.work_start_hour * 60 + settings.work_start_minute)
-        )
-        return max(expected_minutes - self.work_minutes, 0)
-
-    @property
-    def is_late(self):
-        return self.late_minutes > 0
-
-    @property
-    def came_early(self):
-        return self.early_arrival_minutes > 0
-
-    @property
-    def left_early(self):
-        return self.early_leave_minutes > 0
-
-    @property
-    def left_late(self):
-        return self.overtime_minutes > 0
+        return f"{m // 60:02d}:{m % 60:02d}"
