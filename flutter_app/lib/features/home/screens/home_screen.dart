@@ -33,6 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _loadingNews = true;
   bool _loadingSchedule = true;
   bool _actionLoading = false;
+  String? _error;
 
   Timer? _timer;
 
@@ -66,7 +67,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final api = ref.read(apiServiceProvider);
       final records = await api.getMyAttendance(startDate: today, endDate: today);
       if (mounted) setState(() => _today = records.isNotEmpty ? records.first : null);
-    } catch (_) {
+    } catch (e) {
+      if (mounted) setState(() => _error = _parseError(e));
     } finally {
       if (mounted) setState(() => _loadingAttendance = false);
     }
@@ -183,7 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (diff.isNegative) return '';
     final h = diff.inHours;
     final m = diff.inMinutes % 60;
-    return h > 0 ? '${h}ч ${m}м' : '$m м';
+    return h > 0 ? '$h ч $m м' : '$m м';
   }
 
   @override
@@ -198,7 +200,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: AppColors.background,
       body: RefreshIndicator(
         color: AppColors.primary,
-        onRefresh: _loadAll,
+        onRefresh: () async {
+          setState(() => _error = null);
+          await _loadAll();
+        },
         child: CustomScrollView(
           slivers: [
             // ── App Bar ──────────────────────────────────────────────────
@@ -237,7 +242,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     margin: const EdgeInsets.only(right: 16),
                     width: 36,
                     height: 36,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppColors.primaryLight,
                       shape: BoxShape.circle,
                     ),
@@ -264,6 +269,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.all(20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+                  // ── Ошибка сети ────────────────────────────────────────
+                  if (_error != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.error.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.wifi_off_rounded,
+                              color: AppColors.error, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.error,
+                                  fontFamily: 'Inter'),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() => _error = null);
+                              _loadAll();
+                            },
+                            child: const Text('Повтор',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.error)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // ── Дата ──────────────────────────────────────────────
                   _DateBanner(now: now),
                   const SizedBox(height: 16),
@@ -423,7 +470,7 @@ class _AttendanceCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: loading
-          ? _Shimmer(height: 100)
+          ? const _Shimmer(height: 100)
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -576,14 +623,15 @@ class _LunchDutyCallout extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.warning.withOpacity(0.45)),
           ),
-          child: Column(
+          child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.restaurant_menu_rounded, color: AppColors.warning, size: 22),
-                  const SizedBox(width: 8),
-                  const Text(
+                  Icon(Icons.restaurant_menu_rounded,
+                      color: AppColors.warning, size: 22),
+                  SizedBox(width: 8),
+                  Text(
                     'Вы дежурный по обеду сегодня',
                     style: TextStyle(
                       fontFamily: 'Inter',
@@ -594,8 +642,8 @@ class _LunchDutyCallout extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              const Text(
+              SizedBox(height: 10),
+              Text(
                 'Вы должны приготовить обед: от принесения еды до мытья посуды и наведения порядка. '
                 'Если вы не можете выполнить дежурство, перенесите его другому сотруднику. '
                 'Если он примет вашу заявку, тогда он выполнит дежурство. '
@@ -607,7 +655,7 @@ class _LunchDutyCallout extends StatelessWidget {
                   height: 1.45,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'Открыть раздел дежурства →',
                 style: TextStyle(
@@ -780,7 +828,7 @@ class _DutySectionHome extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.border),
         ),
-        child: _Shimmer(height: 50),
+        child: const _Shimmer(height: 50),
       );
     }
 
@@ -958,27 +1006,27 @@ class _ScheduleMini extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
-                const Text('Мой график',
+                Text('Мой график',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                         fontFamily: 'Inter')),
-                const Spacer(),
-                const Text('Подробнее',
+                Spacer(),
+                Text('Подробнее',
                     style: TextStyle(
                         fontSize: 12,
                         color: AppColors.primary,
                         fontFamily: 'Inter')),
-                const Icon(Icons.chevron_right_rounded,
+                Icon(Icons.chevron_right_rounded,
                     color: AppColors.primary, size: 16),
               ],
             ),
             const SizedBox(height: 14),
             if (loading)
-              _Shimmer(height: 48)
+              const _Shimmer(height: 48)
             else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1094,7 +1142,7 @@ class _NewsMini extends StatelessWidget {
           ]),
           const SizedBox(height: 14),
           if (loading)
-            _Shimmer(height: 80)
+            const _Shimmer(height: 80)
           else if (news.isEmpty)
             const Center(
               child: Padding(

@@ -17,8 +17,8 @@
     <h1 class="login-title">Attendance</h1>
     <p class="login-sub">Панель администратора</p>
     <div class="login-error" id="loginError"></div>
-    <input type="text" class="login-field" id="loginUsername" placeholder="Логин или email" value="admin">
-    <input type="password" class="login-field" id="loginPassword" placeholder="Пароль" value="admin123">
+    <input type="text" class="login-field" id="loginUsername" placeholder="Логин или email" autocomplete="username">
+    <input type="password" class="login-field" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
     <button class="login-btn" onclick="doLogin()">Войти</button>
   </div>
 </div>
@@ -73,6 +73,9 @@
     <p class="sidebar-section-label">Аналитика</p>
     <div class="sidebar-item" onclick="showPage('reports', this)">
       <span class="nav-icon">📈</span> Отчёты
+    </div>
+    <div class="sidebar-item" onclick="showPage('auditlog', this)">
+      <span class="nav-icon">🔍</span> Журнал действий
     </div>
   </div>
 
@@ -595,6 +598,47 @@
             </thead>
             <tbody id="newsTable">
               <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOG PAGE -->
+    <div class="page" id="page-auditlog">
+      <div class="section-header">
+        <div class="section-title">Журнал действий администратора</div>
+        <button class="btn btn-primary" onclick="loadAuditLog()">🔄 Обновить</button>
+      </div>
+      <div class="filters" style="margin-bottom:16px">
+        <input class="filter-input" id="auditSearch" placeholder="Поиск по действию..." style="width:240px" oninput="loadAuditLog()">
+        <select class="filter-input" id="auditAction" style="width:220px" onchange="loadAuditLog()">
+          <option value="">Все действия</option>
+          <option value="CREATE_USER">Создание сотрудника</option>
+          <option value="UPDATE_USER">Изменение сотрудника</option>
+          <option value="APPROVE_USER">Подтверждение</option>
+          <option value="REJECT_USER">Отклонение</option>
+          <option value="DEACTIVATE_USER">Деактивация</option>
+          <option value="ASSIGN_DUTY">Назначение дежурства</option>
+          <option value="CREATE_NEWS">Создание новости</option>
+          <option value="DELETE_NEWS">Удаление новости</option>
+          <option value="COMPLETE_DUTY_MANUAL">Ручное подтверждение дежурства</option>
+        </select>
+        <input class="filter-input" id="auditDateFrom" type="date" style="width:160px" onchange="loadAuditLog()">
+        <input class="filter-input" id="auditDateTo" type="date" style="width:160px" onchange="loadAuditLog()">
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Время</th>
+              <th>Администратор</th>
+              <th>Действие</th>
+              <th>Объект</th>
+              <th>Детали</th>
+            </tr></thead>
+            <tbody id="auditLogTable">
+              <tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
             </tbody>
           </table>
         </div>

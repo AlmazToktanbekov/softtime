@@ -25,6 +25,7 @@ from app.schemas.user import (
 from app.utils.security import get_password_hash
 from app.utils.audit import write_audit
 from app.utils.dependencies import get_current_user, require_admin, require_admin_or_teamlead
+from app.utils.fcm import notify_user, notify_users
 
 router = APIRouter(prefix="/users", tags=["Пользователи"])
 
@@ -247,9 +248,20 @@ def change_status(
     db.commit()
     db.refresh(target)
 
-    # TODO: Firebase push notification when PENDING → ACTIVE
     if old_status == UserStatus.PENDING and data.status == UserStatus.ACTIVE:
-        _notify_account_activated(target)
+        notify_user(
+            target,
+            title="Аккаунт активирован",
+            body="Ваш аккаунт активирован администратором",
+            data={"type": "account_activated"},
+        )
+    elif data.status == UserStatus.BLOCKED:
+        notify_user(
+            target,
+            title="Аккаунт заблокирован",
+            body="Ваш аккаунт заблокирован. Обратитесь к администратору",
+            data={"type": "account_blocked"},
+        )
 
     return UserDetail.model_validate(target)
 
@@ -349,6 +361,15 @@ def approve_user(
         new_value={"status": "ACTIVE", "role": data.role},
     )
     db.commit()
+
+    # Push notification → сотруднику
+    notify_user(
+        target,
+        title="Аккаунт подтверждён",
+        body="Ваша заявка одобрена. Добро пожаловать!",
+        data={"type": "account_approved"},
+    )
+
     return {"message": "Сотрудник подтверждён и активирован"}
 
 
@@ -379,6 +400,15 @@ def reject_user(
         new_value={"status": "DELETED", "reason": data.reason},
     )
     db.commit()
+
+    # Push notification → сотруднику
+    notify_user(
+        target,
+        title="Заявка отклонена",
+        body=data.reason or "Ваша заявка на доступ отклонена администратором",
+        data={"type": "account_rejected"},
+    )
+
     return {"message": "Заявка отклонена", "reason": data.reason}
 
 
@@ -447,10 +477,6 @@ def deactivate_user(
     return {"message": "Сотрудник деактивирован"}
 
 
-def _notify_account_activated(user: User) -> None:
-    """Send push notification via Firebase FCM. Not implemented yet."""
-    if user.fcm_token:
-        pass  # TODO: Firebase integration
 
 
 # ── DELETE /users/{user_id} ────────────────────────────────────────────────────

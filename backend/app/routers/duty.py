@@ -25,6 +25,7 @@ from app.schemas.duty import (
 )
 from app.utils.dependencies import get_current_user, require_admin, require_admin_or_teamlead
 from app.utils.audit import write_audit
+from app.utils.fcm import notify_user, notify_users
 from app.services.qr_service import validate_qr_token
 from app.services.duty_service import (
     submit_duty_completion,
@@ -259,6 +260,16 @@ def assign_duty(
             "duty_type": data.duty_type.value,
         },
     )
+
+    # Push notification → дежурному
+    duty_label = "обеда" if data.duty_type.value == "LUNCH" else "уборки"
+    notify_user(
+        u,
+        title="Вы назначены дежурным",
+        body=f"Вы дежурите {data.date} ({duty_label})",
+        data={"type": "duty_assigned", "assignment_id": str(assignment.id)},
+    )
+
     return assignment
 
 
@@ -376,6 +387,25 @@ def complete_duty(
         result = submit_duty_completion(assignment, data.tasks, db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # Push notification → Admin и Super Admin
+    admins = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.in_((UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+            User.fcm_token.isnot(None),
+        )
+        .all()
+    )
+    notify_users(
+        admins,
+        title="Дежурство выполнено — подтвердите",
+        body=f"{current_user.full_name} отметил(а) завершение дежурства",
+        data={"type": "duty_completed", "assignment_id": str(assignment_id)},
+    )
+
     return result
 
 
@@ -630,6 +660,15 @@ def create_swap_request(
     db.add(swap)
     db.commit()
     db.refresh(swap)
+
+    # Push notification → целевому сотруднику
+    notify_user(
+        target,
+        title="Запрос на обмен дежурством",
+        body=f"{current_user.full_name} хочет поменяться с вами дежурством",
+        data={"type": "duty_swap_request", "swap_id": str(swap.id)},
+    )
+
     return DutySwapResponse.from_orm_with_names(swap)
 
 
@@ -687,6 +726,16 @@ def accept_swap(
     swap.responded_at = datetime.now(timezone.utc)
 
     db.commit()
+
+    # Push notification → инициатору обмена
+    requester = db.query(User).filter(User.id == swap.requester_id).first()
+    notify_user(
+        requester,
+        title="Обмен дежурством принят",
+        body=f"{current_user.full_name} принял(а) ваш запрос на обмен",
+        data={"type": "duty_swap_accepted", "swap_id": str(swap.id)},
+    )
+
     return {
         "message": msg,
         "new_user_id": new_user_id,
@@ -715,4 +764,14 @@ def reject_swap(
     swap.responded_by = current_user.id
     swap.responded_at = datetime.now(timezone.utc)
     db.commit()
+
+    # Push notification → инициатору обмена
+    requester = db.query(User).filter(User.id == swap.requester_id).first()
+    notify_user(
+        requester,
+        title="Обмен дежурством отклонён",
+        body=f"{current_user.full_name} отклонил(а) ваш запрос на обмен",
+        data={"type": "duty_swap_rejected", "swap_id": str(swap.id)},
+    )
+
     return {"message": "Запрос отклонён"}

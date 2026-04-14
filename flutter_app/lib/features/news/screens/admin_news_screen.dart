@@ -421,13 +421,13 @@ class _NewsAdminCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert_rounded,
                     color: AppColors.textHint, size: 20),
                 itemBuilder: (ctx) => [
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: 'edit',
                     child: Row(children: [
-                      const Icon(Icons.edit_rounded,
+                      Icon(Icons.edit_rounded,
                           size: 18, color: AppColors.primary),
-                      const SizedBox(width: 10),
-                      const Text('Редактировать'),
+                      SizedBox(width: 10),
+                      Text('Редактировать'),
                     ]),
                   ),
                   PopupMenuItem(
@@ -444,22 +444,22 @@ class _NewsAdminCard extends StatelessWidget {
                       Text(news.pinned ? 'Открепить' : 'Закрепить'),
                     ]),
                   ),
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: 'stats',
                     child: Row(children: [
-                      const Icon(Icons.bar_chart_rounded,
+                      Icon(Icons.bar_chart_rounded,
                           size: 18, color: AppColors.success),
-                      const SizedBox(width: 10),
-                      const Text('Статистика'),
+                      SizedBox(width: 10),
+                      Text('Статистика'),
                     ]),
                   ),
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: 'delete',
                     child: Row(children: [
-                      const Icon(Icons.delete_outline_rounded,
+                      Icon(Icons.delete_outline_rounded,
                           size: 18, color: AppColors.error),
-                      const SizedBox(width: 10),
-                      const Text('Удалить',
+                      SizedBox(width: 10),
+                      Text('Удалить',
                           style: TextStyle(color: AppColors.error)),
                     ]),
                   ),

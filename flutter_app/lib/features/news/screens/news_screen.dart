@@ -18,6 +18,7 @@ class NewsScreen extends ConsumerStatefulWidget {
 class _NewsScreenState extends ConsumerState<NewsScreen> {
   List<News> _news = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -26,11 +27,17 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _error = null; });
     try {
       final list = await ref.read(apiServiceProvider).getNews();
       if (mounted) setState(() => _news = list);
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        final s = e.toString();
+        setState(() => _error = s.contains('SocketException') || s.contains('refused') || s.contains('timed out')
+            ? 'Нет подключения к серверу'
+            : 'Не удалось загрузить новости');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -46,9 +53,38 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
         onRefresh: _load,
         child: _loading
             ? _buildShimmer()
-            : _news.isEmpty
-                ? const _EmptyState()
-                : _buildList(),
+            : _error != null
+                ? _buildError()
+                : _news.isEmpty
+                    ? const _EmptyState()
+                    : _buildList(),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.textHint),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary, fontFamily: 'Inter'),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Потяните вниз для повтора',
+              style: TextStyle(fontSize: 13, color: AppColors.textHint, fontFamily: 'Inter'),
+            ),
+          ],
+        ),
       ),
     );
   }

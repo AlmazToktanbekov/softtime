@@ -1,4 +1,4 @@
-#!/Users/almaz/Developer/attendance_system/backend/.venv/bin/python
+#!/Users/almaz/Developer/softtime/backend/.venv/bin/python
 
 # http://www.python.org/doc/2.4.4/lib/module-itertools.html
 import itertools

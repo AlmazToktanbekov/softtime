@@ -177,29 +177,41 @@ class ApiService {
     return token != null;
   }
 
-  // EMPLOYEE
+  /// Сохранить FCM токен на сервере для получения push-уведомлений.
+  Future<void> updateFcmToken(String fcmToken) async {
+    try {
+      await dio.post('/auth/fcm-token', data: {'fcm_token': fcmToken});
+    } catch (_) {
+      // не блокируем запуск приложения при ошибке
+    }
+  }
+
+  // EMPLOYEE (все вызовы идут на /users — единый роутер backend)
   Future<EmployeeModel> getEmployee(String id) async {
-    final response = await dio.get('/employees/$id');
+    final response = await dio.get('/users/$id');
     return EmployeeModel.fromJson(response.data);
   }
 
   Future<List<EmployeeModel>> getEmployees() async {
-    final response = await dio.get('/employees');
-    return (response.data as List).map((e) => EmployeeModel.fromJson(e)).toList();
+    final response = await dio.get('/users');
+    final data = response.data;
+    // Backend возвращает PaginatedUsers { items: [...], total, page, limit }
+    final list = data is Map ? (data['items'] as List? ?? []) : (data as List);
+    return list.map((e) => EmployeeModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Map<String, dynamic>> createEmployee(Map<String, dynamic> data) async {
-    final response = await dio.post('/employees', data: data);
+    final response = await dio.post('/users', data: data);
     return response.data;
   }
 
   Future<Map<String, dynamic>> updateEmployee(String id, Map<String, dynamic> data) async {
-    final response = await dio.put('/employees/$id', data: data);
+    final response = await dio.put('/users/$id', data: data);
     return response.data;
   }
 
   Future<void> deactivateEmployee(String id) async {
-    await dio.patch('/employees/$id/deactivate');
+    await dio.patch('/users/$id/deactivate');
   }
 
   // EMPLOYEE SCHEDULES

@@ -201,6 +201,8 @@ def _make_user(**kwargs) -> MagicMock:
     u.role = kwargs.get("role", MagicMock(value="EMPLOYEE"))
     u.status = kwargs.get("status", MagicMock())
     u.team_name = None
+    u.team_id = kwargs.get("team_id", None)
+    u.mentor_id = kwargs.get("mentor_id", None)
     u.avatar_url = None
     u.hired_at = None
     u.created_at = datetime.now(timezone.utc)

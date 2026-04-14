@@ -28,7 +28,7 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
   List<DutySwap> _incomingSwaps = [];
 
   // checklist checkbox state per assignment id
-  Map<String, Map<String, bool>> _checked = {};
+  final Map<String, Map<String, bool>> _checked = {};
 
   bool _loadingToday = true;
   bool _loadingSchedule = true;
@@ -580,16 +580,16 @@ class _TodaySection extends StatelessWidget {
     }
 
     if (duties.isEmpty) {
-      return _DutyCard(
+      return const _DutyCard(
         icon: Icons.event_available_rounded,
         title: 'Дежурства сегодня нет',
         subtitle: null,
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [Color(0xFF64748B), Color(0xFF475569)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        shadowColor: const Color(0xFF64748B),
+        shadowColor: Color(0xFF64748B),
         statusLabel: null,
         statusColor: null,
       );

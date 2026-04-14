@@ -1,4 +1,4 @@
-#!/Users/almaz/Developer/attendance_system/backend/.venv/bin/python
+#!/Users/almaz/Developer/softtime/backend/.venv/bin/python
 import sys
 from rsa.cli import decrypt
 if __name__ == '__main__':

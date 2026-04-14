@@ -364,12 +364,12 @@ class _ScheduleEditScreenState
                     color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded,
+                      Icon(Icons.info_outline_rounded,
                           size: 18, color: AppColors.primary),
-                      const SizedBox(width: 10),
-                      const Expanded(
+                      SizedBox(width: 10),
+                      Expanded(
                         child: Text(
                           'Минимальная продолжительность рабочего дня — 6 часов',
                           style: TextStyle(

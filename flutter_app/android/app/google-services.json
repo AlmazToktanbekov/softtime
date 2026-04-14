@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "951740485590",
+    "project_id": "softtime-0021",
+    "storage_bucket": "softtime-0021.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951740485590:android:c6fcc6b05809bd01c55e77",
+        "android_client_info": {
+          "package_name": "com.example.attendance_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8zGnQLaE_d4f41IRFTe2cqe_OITPlGUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

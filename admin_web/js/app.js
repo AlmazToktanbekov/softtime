@@ -95,10 +95,10 @@ async function saveManualCheckout() {
 
 async function openApprovedAbsenceModal() {
   try {
-    const employees = await apiFetch('/employees?include_inactive=false') || [];
+    const employees = await fetchAllUsers();
     const sel = document.getElementById('approvedAbsenceEmployeeId');
     sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
-      employees.map(e => `<option value="${e.id}">${e.full_name} (${e.team_name || '—'})</option>`).join('');
+      employees.filter(e => e.status === 'ACTIVE').map(e => `<option value="${e.id}">${e.full_name} (${e.team_name || '—'})</option>`).join('');
     document.getElementById('approvedAbsenceDate').value = new Date().toISOString().slice(0, 10);
     document.getElementById('approvedAbsenceNote').value = '';
     openModal('approvedAbsence');
@@ -205,6 +205,26 @@ function formatApiDetail(d) {
   return 'API Error';
 }
 
+/** GET /users with pagination until all items are loaded (API returns PaginatedUsers). */
+async function fetchAllUsers(query = {}) {
+  const limit = 100;
+  let page = 1;
+  const all = [];
+  while (true) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    for (const [k, v] of Object.entries(query)) {
+      if (v != null && v !== '') params.set(k, String(v));
+    }
+    const data = await apiFetch(`/users?${params}`);
+    if (!data || !Array.isArray(data.items)) break;
+    all.push(...data.items);
+    if (data.items.length < limit) break;
+    if (typeof data.total === 'number' && all.length >= data.total) break;
+    page++;
+  }
+  return all;
+}
+
 async function apiFetch(url, opts={}) {
   opts.headers = {...(opts.headers||{}), 'Authorization': `Bearer ${accessToken}`, 'Content-Type':'application/json'};
   let r = await fetch(API+url, opts);
@@ -276,6 +296,7 @@ function showPage(name, el) {
     reports: 'Отчёты',
     worktime: 'Рабочее время',
     requests: 'Заявки',
+    auditlog: 'Журнал действий',
   };
   document.getElementById('pageTitle').textContent = titles[name] || name;
 
@@ -289,6 +310,7 @@ function showPage(name, el) {
   else if (name === 'duty') loadDutySchedule();
   else if (name === 'news') loadNews();
   else if (name === 'schedule') loadScheduleEmployeeList();
+  else if (name === 'auditlog') loadAuditLog();
 }
 
 // =========== DASHBOARD ===========
@@ -361,10 +383,11 @@ async function loadDashboard() {
 // =========== EMPLOYEES ===========
 async function loadEmployees() {
   try {
-    const includeInactive = document.getElementById('showInactiveEmployees')?.checked ? 'true' : 'false';
-    allEmployees = await apiFetch(`/employees?include_inactive=${includeInactive}`) || [];
-    const active = allEmployees.filter(e => e.status !== 'PENDING');
-    renderEmployees(active);
+    const showInactive = document.getElementById('showInactiveEmployees')?.checked;
+    allEmployees = await fetchAllUsers();
+    let list = allEmployees.filter(e => e.status !== 'PENDING');
+    if (!showInactive) list = list.filter(e => e.status === 'ACTIVE');
+    renderEmployees(list);
   } catch (e) {
     document.getElementById('employeesTable').innerHTML =
       `<tr><td colspan="6" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${e.message}</td></tr>`;
@@ -416,10 +439,12 @@ function filterEmployees() {
   const search = document.getElementById('empSearch').value.toLowerCase();
   const dept = document.getElementById('empDeptFilter').value.toLowerCase();
   const role = document.getElementById('empRoleFilter').value;
+  const showInactive = document.getElementById('showInactiveEmployees')?.checked;
+  let base = allEmployees.filter(e => e.status !== 'PENDING');
+  if (!showInactive) base = base.filter(e => e.status === 'ACTIVE');
 
   renderEmployees(
-    allEmployees.filter(e =>
-      e.status !== 'PENDING' &&
+    base.filter(e =>
       (!search || (e.full_name || '').toLowerCase().includes(search) || (e.username || '').toLowerCase().includes(search)) &&
       (!dept || (e.team_name || '').toLowerCase().includes(dept)) &&
       (!role || e.role === role)
@@ -440,8 +465,16 @@ function switchEmpTab(tab, el) {
 
 async function loadPendingEmployees() {
   try {
-    const all = await apiFetch('/employees?include_inactive=true') || [];
-    const pending = all.filter(e => e.status === 'PENDING');
+    let pending = [];
+    let page = 1;
+    const limit = 100;
+    while (true) {
+      const data = await apiFetch(`/users/pending?page=${page}&limit=${limit}`);
+      if (!data?.items?.length) break;
+      pending.push(...data.items);
+      if (data.items.length < limit || pending.length >= (data.total ?? 0)) break;
+      page++;
+    }
     const tbody = document.getElementById('pendingTable');
     if (!pending.length) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Нет ожидающих подтверждения</td></tr>';
@@ -469,7 +502,7 @@ async function loadPendingEmployees() {
 
 async function approveEmployee(id) {
   try {
-    await apiFetch(`/employees/${id}/approve`, { method: 'PATCH', body: JSON.stringify({ role: 'EMPLOYEE' }) });
+    await apiFetch(`/users/${id}/approve`, { method: 'PATCH', body: JSON.stringify({ role: 'EMPLOYEE' }) });
     showToast('Сотрудник одобрен', 'success');
     loadPendingEmployees();
     loadPendingBadge();
@@ -481,7 +514,7 @@ async function approveEmployee(id) {
 async function rejectEmployee(id) {
   const reason = prompt('Причина отклонения (необязательно):') || '';
   try {
-    await apiFetch(`/employees/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
+    await apiFetch(`/users/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) });
     showToast('Заявка отклонена', 'success');
     loadPendingEmployees();
     loadPendingBadge();
@@ -492,8 +525,8 @@ async function rejectEmployee(id) {
 
 async function loadPendingBadge() {
   try {
-    const all = await apiFetch('/employees?include_inactive=true') || [];
-    const count = all.filter(e => e.status === 'PENDING').length;
+    const data = await apiFetch('/users/pending?limit=1&page=1');
+    const count = data.total ?? 0;
     const badge = document.getElementById('pendingBadge');
     const tabCount = document.getElementById('pendingTabCount');
     if (count > 0) {
@@ -508,7 +541,7 @@ async function loadPendingBadge() {
 
 async function createEmployee() {
   try {
-    await apiFetch('/employees', {method:'POST', body: JSON.stringify({
+    await apiFetch('/users', {method:'POST', body: JSON.stringify({
       full_name: document.getElementById('empFullName').value,
       email: document.getElementById('empEmail').value,
       phone: document.getElementById('empPhone').value || null,
@@ -524,7 +557,7 @@ async function createEmployee() {
 
 async function activateEmployee(id) {
   try {
-    await apiFetch(`/employees/${id}/activate`, { method: 'PATCH' });
+    await apiFetch(`/users/${id}/activate`, { method: 'PATCH' });
     showToast('Сотрудник активирован', 'success');
     loadEmployees();
   } catch (e) {
@@ -535,7 +568,7 @@ async function activateEmployee(id) {
 async function deleteEmployee(id) {
   if (!confirm('Полностью удалить сотрудника? Если у него есть история, backend не даст удалить.')) return;
   try {
-    await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+    await apiFetch(`/users/${id}`, { method: 'DELETE' });
     showToast('Сотрудник удалён', 'success');
     loadEmployees();
   } catch (e) {
@@ -546,7 +579,7 @@ async function deleteEmployee(id) {
 async function deactivateEmployee(id) {
   if (!confirm('Деактивировать сотрудника?')) return;
   try {
-    await apiFetch(`/employees/${id}/deactivate`, { method: 'PATCH' });
+    await apiFetch(`/users/${id}/deactivate`, { method: 'PATCH' });
     showToast('Сотрудник деактивирован', 'success');
     loadEmployees();
   } catch (e) {
@@ -1124,7 +1157,7 @@ async function loadDutyChecklist() {
 
 async function openAssignDutyModal() {
   try {
-    const employees = await apiFetch('/employees?include_inactive=false') || [];
+    const employees = await fetchAllUsers();
     const sel = document.getElementById('dutyEmployeeId');
     sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
       employees.filter(e => e.status === 'ACTIVE' || e.status === 'WARNING').map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
@@ -1332,7 +1365,7 @@ async function toggleNewsPin(id) {
 // =========== SCHEDULE ===========
 async function loadScheduleEmployeeList() {
   try {
-    const employees = await apiFetch('/employees?include_inactive=false') || [];
+    const employees = await fetchAllUsers();
     const sel = document.getElementById('scheduleEmpSelect');
     const active = employees.filter(e => e.status === 'ACTIVE');
     sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
@@ -1455,6 +1488,61 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 document.getElementById('loginPassword').addEventListener('keydown', e => {
   if (e.key==='Enter') doLogin();
 });
+
+// =========== AUDIT LOG ===========
+async function loadAuditLog() {
+  const search = (document.getElementById('auditSearch')?.value || '').trim();
+  const action = document.getElementById('auditAction')?.value || '';
+  const dateFrom = document.getElementById('auditDateFrom')?.value || '';
+  const dateTo = document.getElementById('auditDateTo')?.value || '';
+
+  const params = new URLSearchParams();
+  if (action) params.append('action', action);
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  params.append('limit', '100');
+
+  const tbody = document.getElementById('auditLogTable');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Загрузка...</td></tr>';
+
+  try {
+    const data = await apiFetch(`/audit-logs?${params.toString()}`);
+    const logs = Array.isArray(data) ? data : (data.items || []);
+
+    if (!logs.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Нет записей</td></tr>';
+      return;
+    }
+
+    // Фильтрация по поиску на клиенте (по action/entity)
+    const filtered = search
+      ? logs.filter(l =>
+          (l.action || '').toLowerCase().includes(search.toLowerCase()) ||
+          (l.entity || '').toLowerCase().includes(search.toLowerCase())
+        )
+      : logs;
+
+    tbody.innerHTML = filtered.map(log => {
+      const ts = log.created_at ? new Date(log.created_at).toLocaleString('ru-RU') : '—';
+      const actor = log.actor_name || log.actor_id || '—';
+      const newVal = log.new_value ? JSON.stringify(log.new_value, null, 0).slice(0, 120) : '—';
+      return `<tr>
+        <td style="white-space:nowrap;font-size:12px">${ts}</td>
+        <td>${escHtml(actor)}</td>
+        <td><span class="badge" style="background:rgba(24,119,242,.1);color:var(--primary);font-size:11px;padding:2px 8px;border-radius:6px">${escHtml(log.action || '—')}</span></td>
+        <td style="font-size:12px">${escHtml(log.entity || '—')} ${log.entity_id ? '<span style="opacity:.5;font-size:10px">' + String(log.entity_id).slice(0,8) + '…</span>' : ''}</td>
+        <td style="font-size:11px;color:var(--text-sub);max-width:300px;word-break:break-all">${escHtml(newVal)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);padding:32px">${escHtml(e.message)}</td></tr>`;
+  }
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 // Init
 if (accessToken) {

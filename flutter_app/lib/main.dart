@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'router.dart';
 import 'core/services/api_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,9 @@ void main() async {
 
   await initializeDateFormatting('ru', null);
   await ApiService().init();
+
+  // Firebase + FCM (работает только если добавлены google-services.json / GoogleService-Info.plist)
+  await FcmService.init();
 
   runApp(const ProviderScope(child: SoftTimeApp()));
 }

@@ -13,6 +13,8 @@ from app.models import (
     Attendance,
     AttendanceStatus,
     User,
+    UserRole,
+    UserStatus,
 )
 from app.schemas.absence_request import (
     AbsenceRequestCreate,
@@ -20,6 +22,7 @@ from app.schemas.absence_request import (
     AbsenceRequestReview,
 )
 from app.utils.dependencies import get_current_user, require_admin
+from app.utils.fcm import notify_user, notify_users
 
 router = APIRouter(prefix="/absence-requests", tags=["Заявки"])
 
@@ -130,6 +133,25 @@ def create_absence_request(
         .filter(AbsenceRequest.id == req.id)
         .first()
     )
+
+    # Push notification → Admin и Super Admin
+    admins = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.in_((UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+            User.fcm_token.isnot(None),
+        )
+        .all()
+    )
+    notify_users(
+        admins,
+        title="Новая заявка на отсутствие",
+        body=f"{current_user.full_name} подал(а) заявку на {data.request_type.value}",
+        data={"type": "absence_request_new", "request_id": str(req.id)},
+    )
+
     return req
 
 
@@ -214,4 +236,21 @@ def review_absence_request(
         .filter(AbsenceRequest.id == req.id)
         .first()
     )
+
+    # Push notification → сотруднику о результате
+    if data.status == AbsenceRequestStatus.approved:
+        notify_user(
+            req.user,
+            title="Заявка одобрена",
+            body="Ваша заявка на отсутствие одобрена",
+            data={"type": "absence_request_approved", "request_id": str(req.id)},
+        )
+    elif data.status == AbsenceRequestStatus.rejected:
+        notify_user(
+            req.user,
+            title="Заявка отклонена",
+            body=data.comment_admin or "Ваша заявка на отсутствие отклонена",
+            data={"type": "absence_request_rejected", "request_id": str(req.id)},
+        )
+
     return req

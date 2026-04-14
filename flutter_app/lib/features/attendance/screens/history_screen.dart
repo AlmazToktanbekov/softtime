@@ -18,6 +18,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   List<AttendanceModel> _records = [];
   bool _loading = true;
+  String? _error;
   DateTimeRange? _dateRange;
 
   @override
@@ -27,7 +28,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _error = null; });
     try {
       final start = _dateRange?.start;
       final end = _dateRange?.end;
@@ -42,8 +43,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           _loading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        final s = e.toString();
+        setState(() {
+          _loading = false;
+          _error = s.contains('SocketException') || s.contains('refused') || s.contains('timed out')
+              ? 'Нет подключения к серверу'
+              : 'Не удалось загрузить историю';
+        });
+      }
     }
   }
 
@@ -98,7 +107,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       ),
       body: _loading
           ? _buildShimmer()
-          : _records.isEmpty
+          : _error != null
+              ? _buildError()
+              : _records.isEmpty
               ? const _EmptyState()
               : RefreshIndicator(
                   onRefresh: _load,
@@ -111,6 +122,35 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         _AttendanceCard(record: _records[i]),
                   ),
                 ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.textHint),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary, fontFamily: 'Inter'),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Повторить'),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(160, 46)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

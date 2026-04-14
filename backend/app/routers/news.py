@@ -17,6 +17,7 @@ from app.schemas.news import (
 )
 from app.utils.dependencies import get_current_user, require_admin
 from app.utils.audit import write_audit
+from app.utils.fcm import notify_users
 
 router = APIRouter(prefix="/news", tags=["Новости"])
 
@@ -98,6 +99,24 @@ def create_news(
     write_audit(db, actor_id=current_user.id, action="CREATE_NEWS",
                 entity="News", entity_id=news.id,
                 new_value={"title": news.title, "pinned": news.pinned})
+
+    # Push notification → все активные сотрудники
+    active_users = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.fcm_token.isnot(None),
+        )
+        .all()
+    )
+    notify_users(
+        active_users,
+        title="Новая новость",
+        body=news.title,
+        data={"type": "new_news", "news_id": str(news.id)},
+    )
+
     return news
 
 

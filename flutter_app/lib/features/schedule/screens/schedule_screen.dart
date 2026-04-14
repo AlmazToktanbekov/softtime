@@ -15,6 +15,7 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   List<EmployeeScheduleModel> _schedules = [];
   bool _loading = true;
+  String? _error;
 
   static const _dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   static const _dayNamesFull = [
@@ -34,13 +35,22 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
     try {
       final auth = ref.read(authProvider);
       final userId = auth.user?.id;
       if (userId == null) return;
       final schedules = await ApiService().getEmployeeSchedules(userId);
       if (mounted) setState(() => _schedules = schedules);
-    } catch (_) {
+    } catch (e) {
+      if (mounted) {
+        final s = e.toString();
+        if (s.contains('SocketException') || s.contains('refused') || s.contains('timed out')) {
+          setState(() => _error = 'Нет подключения к серверу');
+        } else {
+          setState(() => _error = 'Не удалось загрузить расписание');
+        }
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -64,7 +74,75 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : _buildBody(),
+          : _error != null
+              ? _buildError()
+              : _schedules.isEmpty
+                  ? _buildEmpty()
+                  : _buildBody(),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 56, color: AppColors.textHint),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary, fontFamily: 'Inter'),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Повторить'),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(160, 46)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: const BoxDecoration(
+                  color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.calendar_month_outlined,
+                  size: 40, color: AppColors.primary),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'График не настроен',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary, fontFamily: 'Inter'),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Обратитесь к администратору\nдля настройки расписания',
+              style: TextStyle(
+                  fontSize: 14, color: AppColors.textSecondary,
+                  fontFamily: 'Inter', height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -197,7 +275,7 @@ class _DayCard extends StatelessWidget {
     final hours = durationMinutes ~/ 60;
     final mins = durationMinutes % 60;
     final durationStr = durationMinutes > 0
-        ? (mins > 0 ? '${hours}ч ${mins}м' : '$hours ч')
+        ? (mins > 0 ? '$hours ч $mins м' : '$hours ч')
         : null;
 
     return Container(

@@ -1,10 +1,11 @@
 """
 Cron jobs для SoftTime.
 
-Задача 23:00 — помечает все незакрытые сессии посещаемости как INCOMPLETE.
-Запускается один раз в сутки в 23:00 по местному времени.
+Задача 23:00:
+  1. Помечает все незакрытые сессии посещаемости как INCOMPLETE.
+  2. Проверяет невыполненные дежурства и уведомляет Admin.
 """
-from datetime import date, datetime
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,12 @@ def mark_incomplete_sessions():
     """
     Для всех записей attendance за сегодня, где check_in есть, а check_out нет,
     и статус PRESENT или LATE — ставим INCOMPLETE.
+    Уведомляем Admin о списке сотрудников, забывших check-out.
     """
     from app.database import SessionLocal
     from app.models.attendance import Attendance, AttendanceStatus
+    from app.models.user import User, UserRole, UserStatus
+    from app.utils.fcm import notify_users
 
     db = SessionLocal()
     try:
@@ -42,11 +46,80 @@ def mark_incomplete_sessions():
         if count:
             db.commit()
             logger.info(f"[CRON 23:00] INCOMPLETE: помечено {count} записей за {today}")
+
+            # Уведомить Admin о сотрудниках, забывших check-out
+            admins = (
+                db.query(User)
+                .filter(
+                    User.deleted_at.is_(None),
+                    User.status == UserStatus.ACTIVE,
+                    User.role.in_((UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+                    User.fcm_token.isnot(None),
+                )
+                .all()
+            )
+            notify_users(
+                admins,
+                title="Незакрытые сессии посещаемости",
+                body=f"{count} сотрудник(а/ов) не сделали check-out за {today}",
+                data={"type": "incomplete_sessions", "count": count, "date": str(today)},
+            )
         else:
             logger.info(f"[CRON 23:00] Нет незакрытых сессий за {today}")
     except Exception as e:
         db.rollback()
-        logger.error(f"[CRON 23:00] Ошибка: {e}")
+        logger.error(f"[CRON 23:00] Ошибка посещаемости: {e}")
+    finally:
+        db.close()
+
+
+def check_incomplete_duties():
+    """
+    Проверяет дежурства за сегодня, которые не подтверждены к 23:00.
+    Уведомляет Admin.
+    """
+    from app.database import SessionLocal
+    from app.models.duty import DutyAssignment
+    from app.models.user import User, UserRole, UserStatus
+    from app.utils.fcm import notify_users
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+        unverified = (
+            db.query(DutyAssignment)
+            .filter(
+                DutyAssignment.date == today,
+                DutyAssignment.verified.is_(False),
+            )
+            .all()
+        )
+
+        if not unverified:
+            logger.info(f"[CRON 23:00] Все дежурства за {today} подтверждены")
+            return
+
+        count = len(unverified)
+        logger.warning(f"[CRON 23:00] Неподтверждённые дежурства: {count} за {today}")
+
+        admins = (
+            db.query(User)
+            .filter(
+                User.deleted_at.is_(None),
+                User.status == UserStatus.ACTIVE,
+                User.role.in_((UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+                User.fcm_token.isnot(None),
+            )
+            .all()
+        )
+        notify_users(
+            admins,
+            title="Дежурства не подтверждены",
+            body=f"{count} дежурств(а) не выполнено или не подтверждено за {today}",
+            data={"type": "duty_incomplete", "count": count, "date": str(today)},
+        )
+    except Exception as e:
+        logger.error(f"[CRON 23:00] Ошибка проверки дежурств: {e}")
     finally:
         db.close()
 
@@ -62,6 +135,14 @@ def setup_scheduler():
         hour=23,
         minute=0,
         id="incomplete_23",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        check_incomplete_duties,
+        trigger="cron",
+        hour=23,
+        minute=5,
+        id="duty_check_23",
         replace_existing=True,
     )
     return scheduler

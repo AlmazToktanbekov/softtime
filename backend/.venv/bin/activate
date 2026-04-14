@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/almaz/Developer/attendance_system/backend/.venv"
+VIRTUAL_ENV="/Users/almaz/Developer/softtime/backend/.venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

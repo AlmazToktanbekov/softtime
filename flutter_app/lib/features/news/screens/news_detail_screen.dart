@@ -114,7 +114,40 @@ class _NewsDetailScreenState extends ConsumerState<NewsDetailScreen> {
                       news.imageUrl!,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          height: 200,
+                          decoration: BoxDecoration(
+                            color: AppColors.divider,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary, strokeWidth: 2),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: AppColors.divider,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.broken_image_outlined,
+                                size: 40, color: AppColors.textHint),
+                            SizedBox(height: 8),
+                            Text('Не удалось загрузить изображение',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textHint,
+                                    fontFamily: 'Inter')),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),

@@ -15,6 +15,7 @@ from app.schemas.auth import (
     UserMeResponse,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.fcm import notify_users
 from app.utils.redis_client import (
     blacklist_token,
     clear_failed_attempts,
@@ -101,7 +102,23 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
 
-    # TODO: push notification to admin
+    # Push notification → все Admin и Super Admin
+    admins = (
+        db.query(User)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.in_((UserRole.ADMIN, UserRole.SUPER_ADMIN)),
+            User.fcm_token.isnot(None),
+        )
+        .all()
+    )
+    notify_users(
+        admins,
+        title="Новый сотрудник ожидает подтверждения",
+        body=f"{data.full_name} ждёт одобрения",
+        data={"type": "new_pending_user"},
+    )
 
     return {"message": "Заявка отправлена. Ожидайте подтверждения администратором."}
 
@@ -221,3 +238,23 @@ def logout(
 @router.get("/me", response_model=UserMeResponse)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+# ── POST /fcm-token ────────────────────────────────────────────────────────────
+
+@router.post("/fcm-token", status_code=status.HTTP_204_NO_CONTENT)
+def update_fcm_token(
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Сохранить FCM токен устройства для push-уведомлений.
+    Тело: {"fcm_token": "..."}
+    """
+    token = (data.get("fcm_token") or "").strip()
+    if not token:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="fcm_token обязателен")
+    current_user.fcm_token = token
+    db.commit()
