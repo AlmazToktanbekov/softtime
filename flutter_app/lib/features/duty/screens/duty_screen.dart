@@ -104,16 +104,29 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
     }
   }
 
-  Map<String, bool> _checklistForAssignment(String assignmentId) {
-    if (!_checked.containsKey(assignmentId)) {
-      _checked[assignmentId] = {for (final i in _checklist) i.id: false};
-    }
-    return _checked[assignmentId]!;
+  List<DutyChecklistItem> _itemsForDuty(DutyAssignment duty) {
+    return _checklist
+        .where((i) => i.dutyType == null || i.dutyType == duty.dutyType)
+        .toList();
   }
 
-  bool _allCheckedFor(String assignmentId) {
-    final map = _checklistForAssignment(assignmentId);
-    return _checklist.isNotEmpty && map.values.every((v) => v);
+  Map<String, bool> _checklistMapFor(DutyAssignment duty) {
+    final items = _itemsForDuty(duty);
+    final id = duty.id;
+    _checked.putIfAbsent(id, () => {});
+    final map = _checked[id]!;
+    for (final i in items) {
+      map.putIfAbsent(i.id, () => false);
+    }
+    map.removeWhere((key, _) => !items.any((i) => i.id == key));
+    return map;
+  }
+
+  bool _allCheckedFor(DutyAssignment duty) {
+    final items = _itemsForDuty(duty);
+    if (items.isEmpty) return true;
+    final map = _checklistMapFor(duty);
+    return items.every((i) => map[i.id] == true);
   }
 
   Future<void> _completeDuty(DutyAssignment assignment) async {
@@ -122,7 +135,7 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
 
     setState(() => _completing = true);
     try {
-      final taskIds = _checklistForAssignment(assignment.id)
+      final taskIds = _checklistMapFor(assignment)
           .entries
           .where((e) => e.value)
           .map((e) => e.key)
@@ -492,19 +505,17 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
                 const SizedBox(height: 20),
 
                 // My checklists for today's duties
-                ...myTodayDuties.map((duty) => Column(
+                               ...myTodayDuties.map((duty) => Column(
                   children: [
                     _ChecklistCard(
                       assignment: duty,
-                      items: _checklist
-                          .where((i) => i.dutyType == null || i.dutyType == duty.dutyType)
-                          .toList(),
+                      items: _itemsForDuty(duty),
                       loading: _loadingChecklist,
-                      checked: _checklistForAssignment(duty.id),
+                      checked: _checklistMapFor(duty),
                       onToggle: (id, val) => setState(() {
-                        _checklistForAssignment(duty.id)[id] = val;
+                        _checklistMapFor(duty)[id] = val;
                       }),
-                      allChecked: _allCheckedFor(duty.id),
+                      allChecked: _allCheckedFor(duty),
                       completing: _completing,
                       onComplete: () => _completeDuty(duty),
                     ),
@@ -779,30 +790,35 @@ class _ChecklistCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isLunch ? const Color(0xFFFEF3C7) : const Color(0xFFEDE9FE),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(assignment.typeEmoji, style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Задачи — ${assignment.typeLabel}',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isLunch ? const Color(0xFFD97706) : const Color(0xFF7C3AED),
-                        fontFamily: 'Inter',
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isLunch ? const Color(0xFFFEF3C7) : const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(assignment.typeEmoji, style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Задачи — ${assignment.typeLabel}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isLunch ? const Color(0xFFD97706) : const Color(0xFF7C3AED),
+                            fontFamily: 'Inter',
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Text('$done / $total',
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600,
@@ -898,7 +914,7 @@ class _ChecklistCard extends StatelessWidget {
           if (!allChecked && items.isNotEmpty && !assignment.isCompleted) ...[
             const SizedBox(height: 8),
             const Center(
-              child: Text('Отметьте все задачи, чтобы подтвердить',
+              child: Text('Отметьте все задачи, чтобы открыть сканирование QR',
                   style: TextStyle(fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter')),
             ),
           ],

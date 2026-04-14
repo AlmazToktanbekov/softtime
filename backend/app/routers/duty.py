@@ -31,6 +31,7 @@ from app.services.duty_service import (
     submit_duty_completion,
     verify_duty_completion,
     generate_duty_assignments,
+    reset_duty_assignment_progress,
 )
 
 router = APIRouter(prefix="/duty", tags=["Дежурство"])
@@ -218,6 +219,8 @@ def assign_duty(
 
     if existing:
         old_uid = str(existing.user_id)
+        if existing.user_id != data.user_id:
+            reset_duty_assignment_progress(existing)
         existing.user_id = data.user_id
         db.commit()
         db.refresh(existing)

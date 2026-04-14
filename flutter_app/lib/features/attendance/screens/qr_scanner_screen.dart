@@ -6,7 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
 class QRScannerScreen extends StatefulWidget {
-  final String mode; // 'check_in' or 'check_out'
+  /// check_in | check_out | duty_complete
+  final String mode;
   const QRScannerScreen({super.key, required this.mode});
 
   @override
@@ -69,9 +70,13 @@ class _QRScannerScreenState extends State<QRScannerScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDuty = widget.mode == 'duty_complete';
     final isCheckIn = widget.mode == 'check_in';
-    final title = isCheckIn ? 'Сканирование прихода' : 'Сканирование ухода';
-    final color = isCheckIn ? AppColors.success : AppColors.error;
+    final title = isDuty
+        ? 'Дежурство — скан QR'
+        : (isCheckIn ? 'Сканирование прихода' : 'Сканирование ухода');
+    final color =
+        isDuty ? AppColors.primary : (isCheckIn ? AppColors.success : AppColors.error);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -139,15 +144,19 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          isCheckIn
-                              ? Icons.login_rounded
-                              : Icons.logout_rounded,
+                          isDuty
+                              ? Icons.cleaning_services_rounded
+                              : (isCheckIn
+                                  ? Icons.login_rounded
+                                  : Icons.logout_rounded),
                           color: color,
                           size: 18,
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          isCheckIn ? 'Отметка прихода' : 'Отметка ухода',
+                          isDuty
+                              ? 'Завершение дежурства'
+                              : (isCheckIn ? 'Отметка прихода' : 'Отметка ухода'),
                           style: TextStyle(
                               color: color,
                               fontWeight: FontWeight.w700,
@@ -158,7 +167,10 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Наведите камеру на QR-код офиса',
+                    isDuty
+                        ? 'Отсканируйте тот же офисный QR, что для входа/выхода'
+                        : 'Наведите камеру на QR-код офиса',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                         color: Colors.white.withOpacity(0.7), fontSize: 14),
                   ),
@@ -218,7 +230,9 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        isCheckIn ? 'Отмечаем приход...' : 'Отмечаем уход...',
+                        isDuty
+                            ? 'Проверяем QR...'
+                            : (isCheckIn ? 'Отмечаем приход...' : 'Отмечаем уход...'),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,

@@ -456,8 +456,15 @@ class _AttendanceCard extends StatelessWidget {
     this.enableCheckInOut = true,
   });
 
-  bool get _canCheckIn => record == null || record!.checkInTime == null;
-  bool get _canCheckOut => record?.checkInTime != null && record?.checkOutTime == null;
+  bool get _excusedToday =>
+      record != null && record!.status.toLowerCase() == 'approved_absence';
+
+  bool get _canCheckIn =>
+      !_excusedToday && (record == null || record!.checkInTime == null);
+  bool get _canCheckOut =>
+      !_excusedToday &&
+      record?.checkInTime != null &&
+      record?.checkOutTime == null;
   bool get _done => record?.checkOutTime != null;
 
   @override
@@ -475,15 +482,29 @@ class _AttendanceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Посещаемость сегодня',
+                    const Expanded(
+                      child: Text(
+                        'Посещаемость сегодня',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
-                            fontFamily: 'Inter')),
-                    const Spacer(),
-                    if (record != null) StatusBadge(status: record!.status),
+                            fontFamily: 'Inter'),
+                      ),
+                    ),
+                    if (record != null) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: StatusBadge(status: record!.status),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -581,6 +602,37 @@ class _AttendanceCard extends StatelessWidget {
                         fontFamily: 'Inter',
                         height: 1.4,
                       ),
+                    ),
+                  )
+                else if (_excusedToday)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.successLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.success.withOpacity(0.25)),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.verified_user_rounded,
+                            color: AppColors.success, size: 22),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Сегодня у вас разрешённое отсутствие (отпуск, больничный и т.д.). '
+                            'Отметки прихода и ухода не нужны.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'Inter',
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else if (actionLoading)

@@ -158,7 +158,6 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
         UserStatus.PENDING: "Аккаунт ожидает подтверждения администратором",
         UserStatus.BLOCKED: "Аккаунт заблокирован. Обратитесь к администратору",
         UserStatus.DELETED: "Аккаунт удалён",
-        UserStatus.LEAVE: "Аккаунт на паузе. Обратитесь к администратору",
     }
     if user.status in _blocked_statuses:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=_blocked_statuses[user.status])
@@ -197,7 +196,7 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
 
     user_id = payload.get("sub")
     user: Optional[User] = db.query(User).filter(User.id == user_id).first()
-    if not user or user.status not in (UserStatus.ACTIVE, UserStatus.WARNING):
+    if not user or user.status in (UserStatus.BLOCKED, UserStatus.DELETED, UserStatus.PENDING):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден или неактивен")
 
     # Rotate: blacklist old refresh token

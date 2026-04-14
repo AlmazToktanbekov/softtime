@@ -15,16 +15,28 @@ import 'features/attendance/screens/history_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'features/requests/screens/requests_screen.dart';
 import 'features/schedule/screens/schedule_screen.dart';
-import 'features/admin/screens/admin_screen.dart';
+import 'features/tasks/screens/tasks_screen.dart';
+import 'features/team/screens/team_screen.dart';
+
+// Admin
+import 'features/admin/admin_shell.dart';
+import 'features/admin/screens/admin_dashboard_screen.dart';
+import 'features/admin/screens/admin_employees_screen.dart';
+import 'features/admin/screens/admin_attendance_screen.dart';
+import 'features/admin/screens/admin_reports_screen.dart';
+import 'features/admin/screens/admin_more_screen.dart';
+import 'features/admin/screens/admin_leave_requests_screen.dart';
+import 'features/admin/screens/admin_networks_screen.dart';
+import 'features/admin/screens/admin_qr_screen.dart';
 import 'features/news/screens/admin_news_screen.dart';
 import 'features/duty/screens/admin_duty_screen.dart';
 import 'features/schedule/screens/admin_schedule_screen.dart';
-import 'features/tasks/screens/tasks_screen.dart';
-import 'features/team/screens/team_screen.dart';
+
 import 'core/services/auth_provider.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
+final _adminShellNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.watch(authProvider);
@@ -36,23 +48,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final loading = auth.isLoading;
       final loggedIn = auth.isAuthenticated;
+      final isAdmin = auth.isAdmin;
 
-      // Пока идёт инициализация — показываем splash
       if (loading && loc != '/splash') return '/splash';
 
-      final publicRoutes = {'/splash', '/login', '/register'};
+      const publicRoutes = {'/splash', '/login', '/register'};
       if (!loggedIn && !publicRoutes.contains(loc)) return '/login';
-      if (loggedIn && (loc == '/login' || loc == '/register')) return '/home';
 
-      // Защита admin-роутов: только ADMIN и SUPER_ADMIN
-      const adminPaths = ['/home/admin'];
-      final isAdminPath = adminPaths.any((p) => loc.startsWith(p));
-      if (isAdminPath && loggedIn && !auth.isAdmin) return '/home';
+      // After login, route by role
+      if (loggedIn && (loc == '/login' || loc == '/register')) {
+        return isAdmin ? '/admin' : '/home';
+      }
+
+      // Admins should not be on employee routes
+      if (loggedIn && isAdmin && loc == '/home') return '/admin';
+
+      // Employees should not be on admin routes
+      if (loggedIn && !isAdmin && loc.startsWith('/admin')) return '/home';
 
       return null;
     },
     routes: [
-      // ── Auth group ──────────────────────────────────────────────────────────
+      // ── Auth ────────────────────────────────────────────────────────────────
       GoRoute(
         path: '/splash',
         builder: (_, __) => const SplashScreen(),
@@ -66,7 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, state) => _slideRoute(state, const RegistrationScreen()),
       ),
 
-      // ── QR Scanner (full-screen, above shell) ───────────────────────────────
+      // ── QR Scanner (full-screen) ─────────────────────────────────────────────
       GoRoute(
         path: '/qr-scanner',
         parentNavigatorKey: _rootNavigatorKey,
@@ -76,7 +93,78 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // ── Main shell (bottom nav) ──────────────────────────────────────────────
+      // ── Admin shell ──────────────────────────────────────────────────────────
+      ShellRoute(
+        navigatorKey: _adminShellNavigatorKey,
+        pageBuilder: (context, state, child) {
+          return NoTransitionPage(child: AdminShell(child: child));
+        },
+        routes: [
+          GoRoute(
+            path: '/admin',
+            pageBuilder: (_, state) =>
+                _fadeRoute(state, const AdminDashboardScreen()),
+          ),
+          GoRoute(
+            path: '/admin/employees',
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const AdminEmployeesScreen()),
+          ),
+          GoRoute(
+            path: '/admin/attendance',
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const AdminAttendanceScreen()),
+          ),
+          GoRoute(
+            path: '/admin/reports',
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const AdminReportsScreen()),
+          ),
+          GoRoute(
+            path: '/admin/more',
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const AdminMoreScreen()),
+          ),
+        ],
+      ),
+
+      // ── Admin full-screen push routes ────────────────────────────────────────
+      GoRoute(
+        path: '/admin/news',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) => _slideRoute(state, const AdminNewsScreen()),
+      ),
+      GoRoute(
+        path: '/admin/duty',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) =>
+            _slideRoute(state, const AdminDutyScreen()),
+      ),
+      GoRoute(
+        path: '/admin/schedule',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) =>
+            _slideRoute(state, const AdminScheduleScreen()),
+      ),
+      GoRoute(
+        path: '/admin/requests',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) =>
+            _slideRoute(state, const AdminLeaveRequestsScreen()),
+      ),
+      GoRoute(
+        path: '/admin/qr',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) => _slideRoute(state, const AdminQrScreen()),
+      ),
+      GoRoute(
+        path: '/admin/networks',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (_, state) =>
+            _slideRoute(state, const AdminNetworksScreen()),
+      ),
+
+      // ── Employee shell (bottom nav) ──────────────────────────────────────────
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         pageBuilder: (context, state, child) {
@@ -90,67 +178,50 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'history',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const HistoryScreen()),
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const HistoryScreen()),
               ),
               GoRoute(
                 path: 'schedule',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const ScheduleScreen()),
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const ScheduleScreen()),
               ),
               GoRoute(
                 path: 'requests',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const RequestsScreen()),
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const RequestsScreen()),
               ),
               GoRoute(
                 path: 'profile',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const ProfileScreen()),
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const ProfileScreen()),
               ),
               GoRoute(
                 path: 'tasks',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const TasksScreen()),
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const TasksScreen()),
               ),
               GoRoute(
                 path: 'team',
                 parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const TeamScreen()),
-              ),
-              GoRoute(
-                path: 'admin',
-                parentNavigatorKey: _rootNavigatorKey,
-                pageBuilder: (_, state) => _slideRoute(state, const AdminScreen()),
-                routes: [
-                  GoRoute(
-                    path: 'news',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    pageBuilder: (_, state) =>
-                        _slideRoute(state, const AdminNewsScreen()),
-                  ),
-                  GoRoute(
-                    path: 'duty',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    pageBuilder: (_, state) =>
-                        _slideRoute(state, const AdminDutyScreen()),
-                  ),
-                  GoRoute(
-                    path: 'schedule',
-                    parentNavigatorKey: _rootNavigatorKey,
-                    pageBuilder: (_, state) =>
-                        _slideRoute(state, const AdminScheduleScreen()),
-                  ),
-                ],
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const TeamScreen()),
               ),
             ],
           ),
           GoRoute(
             path: '/duty',
-            pageBuilder: (_, state) => _slideRoute(state, const DutyScreen()),
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const DutyScreen()),
           ),
           GoRoute(
             path: '/news',
-            pageBuilder: (_, state) => _slideRoute(state, const NewsScreen()),
+            pageBuilder: (_, state) =>
+                _slideRoute(state, const NewsScreen()),
             routes: [
               GoRoute(
                 path: ':newsId',
@@ -182,9 +253,8 @@ CustomTransitionPage<void> _slideRoute(GoRouterState state, Widget child) {
       final tween = Tween(begin: begin, end: end).chain(
         CurveTween(curve: Curves.easeInOutCubic),
       );
-      final offsetAnimation = animation.drive(tween);
       return SlideTransition(
-        position: offsetAnimation,
+        position: animation.drive(tween),
         child: FadeTransition(
           opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
             CurvedAnimation(parent: animation, curve: Curves.easeOut),

@@ -28,6 +28,9 @@ def validate_qr_token(token: str, db: Session, expected_type: Optional[str] = No
         effective = qr.type
         if expected_type == "attendance" and effective == "static":
             effective = "attendance"
+        # Тот же офисный QR, что для прихода/ухода, используется для подтверждения дежурства.
+        if expected_type == "duty" and effective in ("attendance", "static"):
+            return True, "OK"
         if effective != expected_type:
             return False, f"QR-код неверного типа: ожидается {expected_type}, получено {qr.type}"
 

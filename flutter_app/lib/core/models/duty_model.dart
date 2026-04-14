@@ -1,3 +1,13 @@
+bool _jsonBool(dynamic v, {bool fallback = false}) {
+  if (v is bool) return v;
+  if (v is int) return v != 0;
+  if (v is String) {
+    final s = v.toLowerCase();
+    return s == 'true' || s == '1';
+  }
+  return fallback;
+}
+
 class DutyQueueItem {
   final String userId;
   final int queueOrder;
@@ -50,11 +60,11 @@ class DutyAssignment {
       userFullName: json['user_full_name']?.toString(),
       date: json['date'].toString(),
       dutyType: json['duty_type']?.toString() ?? 'LUNCH',
-      isCompleted: json['is_completed'] as bool,
+      isCompleted: _jsonBool(json['is_completed']),
       completionTasks: json['completion_tasks'] as List<dynamic>?,
-      completionQrVerified: json['completion_qr_verified'] as bool,
+      completionQrVerified: _jsonBool(json['completion_qr_verified']),
       completedAt: json['completed_at']?.toString(),
-      verified: json['verified'] as bool,
+      verified: _jsonBool(json['verified']),
       verifiedBy: json['verified_by']?.toString(),
       verifiedAt: json['verified_at']?.toString(),
       adminNote: json['admin_note']?.toString(),
@@ -180,8 +190,8 @@ class DutyOverviewEntry {
         dutyType: json['duty_type'].toString(),
         userId: json['user_id']?.toString(),
         userFullName: json['user_full_name']?.toString(),
-        isCompleted: json['is_completed'] as bool,
-        verified: json['verified'] as bool,
+        isCompleted: _jsonBool(json['is_completed']),
+        verified: _jsonBool(json['verified']),
       );
 
   String get typeLabel => dutyType == 'LUNCH' ? 'Обед' : 'Уборка';

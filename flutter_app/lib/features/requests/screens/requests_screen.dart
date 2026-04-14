@@ -1,4 +1,5 @@
 // ignore_for_file: deprecated_member_use
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -110,10 +111,33 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
       _tabController.animateTo(1);
     } catch (e) {
       if (!mounted) return;
-      _showSnack('Ошибка: $e', isError: true);
+      _showSnack(_formatSubmitError(e), isError: true);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _formatSubmitError(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final detail = data['detail'];
+        if (detail is String) return detail;
+        if (detail is List) {
+          final parts = <String>[];
+          for (final item in detail) {
+            if (item is Map && item['msg'] != null) {
+              parts.add(item['msg'].toString());
+            } else {
+              parts.add(item.toString());
+            }
+          }
+          if (parts.isNotEmpty) return parts.join(' ');
+        }
+      }
+      if (e.message != null && e.message!.isNotEmpty) return e.message!;
+    }
+    return e.toString();
   }
 
   void _showSnack(String message, {bool isError = false}) {

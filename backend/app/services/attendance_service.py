@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.attendance import Attendance, AttendanceStatus, CheckInStatus, CheckOutStatus
 from app.models.attendance_log import AttendanceLog
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.models.work_settings import WorkSettings
 from app.models.employee_schedule import EmployeeSchedule
 
@@ -52,6 +52,11 @@ def process_check_in(
     office_network_id: Optional[int],
     db: Session,
 ) -> Tuple[bool, str, Optional[Attendance]]:
+    if user.status == UserStatus.PENDING:
+        return False, "Ожидайте подтверждения администратора", None
+    if user.status == UserStatus.LEAVE:
+        return False, "В отпуске нельзя отмечать приход", None
+
     today = _today()
     now = datetime.now().astimezone()
 
@@ -114,6 +119,11 @@ def process_check_out(
     office_network_id: Optional[int],
     db: Session,
 ) -> Tuple[bool, str, Optional[Attendance]]:
+    if user.status == UserStatus.PENDING:
+        return False, "Ожидайте подтверждения администратора", None
+    if user.status == UserStatus.LEAVE:
+        return False, "В отпуске нельзя отмечать уход", None
+
     today = _today()
     now = datetime.now().astimezone()
 

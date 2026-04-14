@@ -727,8 +727,8 @@ class _ReportTab extends StatelessWidget {
                 AppColors.primaryLight,
               ),
               _StatCard(
-                'Присутствуют',
-                '${summary['present']}',
+                'Были сегодня',
+                '${summary['worked_today'] ?? 0}',
                 Icons.check_circle_outline,
                 AppColors.success,
                 AppColors.successLight,

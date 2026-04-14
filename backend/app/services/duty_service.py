@@ -30,6 +30,18 @@ def get_current_duty_user(
     return db.query(User).filter(User.id == assignment.user_id).first()
 
 
+def reset_duty_assignment_progress(assignment: DutyAssignment) -> None:
+    """Сброс отметок выполнения (новый ответственный или переназначение слота)."""
+    assignment.is_completed = False
+    assignment.completion_tasks = None
+    assignment.completion_qr_verified = False
+    assignment.completed_at = None
+    assignment.verified = False
+    assignment.verified_by = None
+    assignment.verified_at = None
+    assignment.admin_note = None
+
+
 def submit_duty_completion(
     assignment: DutyAssignment,
     task_ids: List[UUID],
