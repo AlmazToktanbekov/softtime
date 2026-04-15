@@ -13,11 +13,12 @@ const API = (() => {
     return normalize(storedValue);
   }
 
-  if (window.location.protocol.startsWith('http')) {
-    const host = window.location.hostname || 'localhost';
-    return `${window.location.protocol}//${host}:8000/api/v1`;
+  // http(s) на сервере — тот же host, что и у страницы (например :8000/admin/ → :8000/api/v1)
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    return `${window.location.origin}/api/v1`;
   }
 
+  // file:// — задайте ?api=... один раз или положите api_base_url в localStorage
   return 'http://localhost:8000/api/v1';
 })();
 let accessToken = localStorage.getItem('access_token');

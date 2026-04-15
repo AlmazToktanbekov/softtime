@@ -90,6 +90,33 @@ os.makedirs(_uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
+def _resolve_admin_web_dir() -> str | None:
+    """Папка admin_web: .env ADMIN_WEB_DIR или рядом с backend в репозитории / в образе."""
+    explicit = os.getenv("ADMIN_WEB_DIR", "").strip()
+    if explicit:
+        p = os.path.abspath(explicit)
+        return p if os.path.isfile(os.path.join(p, "index.html")) else None
+    here = os.path.dirname(os.path.abspath(__file__))
+    backend_root = os.path.dirname(here)
+    project_root = os.path.dirname(backend_root)
+    for candidate in (
+        os.path.join(project_root, "admin_web"),
+        os.path.join(backend_root, "admin_web"),
+    ):
+        if os.path.isfile(os.path.join(candidate, "index.html")):
+            return candidate
+    return None
+
+
+_admin_static = _resolve_admin_web_dir()
+if _admin_static:
+    app.mount(
+        "/admin",
+        StaticFiles(directory=_admin_static, html=True),
+        name="admin_web",
+    )
+
+
 @app.get("/")
 def root():
     return {
@@ -97,6 +124,7 @@ def root():
         "version": "1.0.0",
         "status": "running",
         "docs": "/docs",
+        "admin_web": "/admin/" if _admin_static else None,
     }
 
 

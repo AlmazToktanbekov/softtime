@@ -39,6 +39,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
+      # Веб-админка (статика): каталог внутри контейнера
+      ADMIN_WEB_DIR: /app/admin_web
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +50,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./admin_web:/app/admin_web:ro
 
 volumes:
   postgres_data:
