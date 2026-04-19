@@ -136,7 +136,7 @@ async function saveApprovedAbsence() {
     showToast('Разрешённое отсутствие сохранено', 'success');
     loadAttendance();
     loadDashboard();
-    if (typeof loadDailyReport === 'function') loadDailyReport();
+    if (typeof loadReports === 'function' && document.getElementById('page-reports')?.classList.contains('active')) loadReports();
   } catch (e) {
     showToast(e.message || e.detail || 'Ошибка', 'error');
   }
@@ -265,7 +265,8 @@ async function tryRefresh() {
 
 // =========== INIT ===========
 async function initApp() {
-  document.getElementById('topbarDate').textContent = new Date().toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const now = new Date();
+  document.getElementById('topbarDate').textContent = now.toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   document.getElementById('dashDate').textContent = new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
   try {
     const me = await apiFetch('/auth/me');
@@ -305,7 +306,7 @@ function showPage(name, el) {
   else if (name === 'attendance') { setDefaultDates(); loadAttendance(); }
   else if (name === 'networks') loadNetworks();
   else if (name === 'qr') { loadCurrentQR(); loadQrHistory(); }
-  else if (name === 'reports') loadDailyReport();
+  else if (name === 'reports') initReportsPage();
   else if (name === 'worktime') loadWorkTimeSettings();
   else if (name === 'requests') loadRequests();
   else if (name === 'duty') loadDutySchedule();
@@ -429,6 +430,7 @@ function renderEmployees(list) {
         ${e.status === 'ACTIVE'
           ? `<button class="btn btn-ghost btn-sm" onclick="deactivateEmployee('${e.id}')" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
           : (e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="activateEmployee('${e.id}')" style="color:var(--accent); border-color:var(--accent)">Актив.</button>` : '')}
+        ${e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="openResetPassword('${e.id}', '${(e.full_name||'').replace(/'/g,'&apos;')}')" style="color:var(--primary); border-color:var(--primary)">🔑 Пароль</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="deleteEmployee('${e.id}')">Удалить</button>
       </td>
     </tr>
@@ -588,6 +590,37 @@ async function deactivateEmployee(id) {
   }
 }
 
+// =========== RESET PASSWORD ===========
+function openResetPassword(id, name) {
+  document.getElementById('resetPwdUserId').value = id;
+  document.getElementById('resetPwdUserName').textContent = name;
+  document.getElementById('resetPwdInput').value = '';
+  document.getElementById('resetPwdConfirm').value = '';
+  document.getElementById('resetPwdError').textContent = '';
+  openModal('resetPassword');
+}
+
+async function confirmResetPassword() {
+  const id  = document.getElementById('resetPwdUserId').value;
+  const pwd = document.getElementById('resetPwdInput').value.trim();
+  const pwd2 = document.getElementById('resetPwdConfirm').value.trim();
+  const errEl = document.getElementById('resetPwdError');
+
+  if (pwd.length < 6) { errEl.textContent = 'Минимум 6 символов'; return; }
+  if (pwd !== pwd2)   { errEl.textContent = 'Пароли не совпадают'; return; }
+
+  try {
+    await apiFetch(`/users/${id}/reset-password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ new_password: pwd }),
+    });
+    closeModal('resetPassword');
+    showToast('Пароль успешно сброшен — передайте его сотруднику лично', 'success');
+  } catch (e) {
+    errEl.textContent = e.message || 'Ошибка';
+  }
+}
+
 // =========== ATTENDANCE ===========
 function setDefaultDates() {
   const today = new Date().toISOString().split('T')[0];
@@ -705,7 +738,7 @@ function renderRequests(list) {
         <td style="font-weight:700">#${r.id}</td>
         <td>
           <div style="font-weight:700">${r.user_full_name || '—'}</div>
-          <div style="font-size:12px; color:var(--text-sub)">${r.user_id}</div>
+          <div style="font-size:12px; color:var(--text-sub)">${r.user_id ? String(r.user_id).slice(0,8) + '…' : ''}</div>
         </td>
         <td>${typeLabel}</td>
         <td>${period}${r.start_time ? `<div style="font-size:12px;color:var(--text-sub)">в ${String(r.start_time).slice(0,5)}</div>` : ''}</td>
@@ -972,75 +1005,307 @@ async function deleteQr(id) {
 
 
 // =========== REPORTS ===========
-function switchReportTab(type, el) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+let reportChart = null;
+let reportMode  = 'period';
+
+function switchReportMode(mode, el) {
+  reportMode = mode;
+  document.querySelectorAll('#page-reports .tab-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  if (type==='daily') loadDailyReport();
-  else loadMonthlyReport();
+  document.getElementById('repEmployeeFilter').style.display = mode === 'employee' ? 'block' : 'none';
+  loadReports();
 }
 
-async function loadDailyReport() {
-  const today = new Date().toISOString().split('T')[0];
+function setQuickPeriod(type, el) {
+  document.querySelectorAll('.period-quick').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  let startStr = todayStr;
+  if (type === 'week') {
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    startStr = mon.toISOString().split('T')[0];
+  } else if (type === 'month') {
+    startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+  }
+  document.getElementById('repStartDate').value = startStr;
+  document.getElementById('repEndDate').value   = todayStr;
+  loadReports();
+}
+
+function clearQuickPeriod() {
+  document.querySelectorAll('.period-quick').forEach(b => b.classList.remove('active'));
+}
+
+function _repFmtDate(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+function _fmtHours(minutes) {
+  if (!minutes) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
+}
+
+function _repStatCards(items) {
+  return `<div class="stats-grid" style="margin-bottom:20px">
+    ${items.map(([l,v,c]) => `
+      <div class="stat-card">
+        <div class="stat-value" style="color:${c}">${v}</div>
+        <div class="stat-label">${l}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+async function initReportsPage() {
+  // Set default date range (current week) and populate employee dropdown
+  setQuickPeriod('week', document.getElementById('pq-week'));
+  // Populate employee select
   try {
-    const r = await apiFetch(`/reports/daily?report_date=${today}`);
-    const s = r.summary;
+    if (!allEmployees.length) allEmployees = await fetchAllUsers();
+    const sel = document.getElementById('repEmployeeId');
+    const activeEmps = allEmployees.filter(e => e.status === 'ACTIVE' &&
+      !['ADMIN','SUPER_ADMIN'].includes(e.role));
+    sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
+      activeEmps.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
+  } catch(_) {}
+}
+
+async function loadReports() {
+  if (reportMode === 'employee') await loadEmployeeReport();
+  else await loadPeriodReport();
+}
+
+async function loadPeriodReport() {
+  const start = document.getElementById('repStartDate').value;
+  const end   = document.getElementById('repEndDate').value;
+  if (!start || !end) return;
+
+  document.getElementById('reportContent').innerHTML =
+    `<div style="text-align:center;padding:48px;color:var(--text-muted)">Загрузка…</div>`;
+
+  try {
+    const data = await apiFetch(`/reports/period?start_date=${start}&end_date=${end}`);
+    const s = data.summary;
+
+    // Also load daily detail for the last day in range (or start if range is 1 day)
+    const detailDate = start === end ? start : end;
+    let dailyDetail = [];
+    try {
+      const daily = await apiFetch(`/reports/daily?report_date=${detailDate}`);
+      dailyDetail = daily.detail || [];
+    } catch(_) {}
+
     document.getElementById('reportContent').innerHTML = `
-      <div class="stats-grid">
-        ${[
-          ['Всего', s.total_employees, 'var(--primary)'],
-          ['Присутствуют', s.present, 'var(--accent)'],
-          ['Опоздали', s.late, 'var(--warning)'],
-          ['Отсутствуют', s.absent, 'var(--error)'],
-        ].map(([l,v,c]) => `
-          <div class="stat-card">
-            <div class="stat-value" style="color:${c}">${v}</div>
-            <div class="stat-label">${l}</div>
-          </div>`).join('')}
+      ${_repStatCards([
+        ['Всего сотрудников',  s.total_employees,              'var(--primary)'],
+        ['Присутствовали',     s.worked_today ?? s.present,    'var(--accent)'],
+        ['Опоздали',           s.late,                         'var(--warning)'],
+        ['Отсутствовали',      s.absent,                       'var(--error)'],
+      ])}
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title">📊 Посещаемость по дням</div>
+            <div class="card-sub">${_repFmtDate(start)} — ${_repFmtDate(end)}</div>
+          </div>
+        </div>
+        <div style="position:relative;height:280px;padding:4px 0">
+          <canvas id="reportChartCanvas"></canvas>
+        </div>
       </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Детали за ${today}</div></div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><div class="card-title">👥 Сводка по сотрудникам</div></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Приход</th><th>Уход</th><th>Статус</th><th>Опоздание</th></tr></thead>
-            <tbody>${r.detail.map(d => `
+            <thead><tr>
+              <th>Сотрудник</th><th>Отдел</th>
+              <th>Дней присут.</th><th>Часов работал</th>
+              <th>Опоздания (дн)</th><th>Опоздание</th>
+              <th>Отсутствия</th><th>Разреш. отсут.</th>
+            </tr></thead>
+            <tbody>${!data.employees.length
+              ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">Нет данных</td></tr>'
+              : data.employees.map(e => `
+                <tr>
+                  <td style="font-weight:700">${e.full_name}</td>
+                  <td>${e.team_name||'—'}</td>
+                  <td style="color:var(--accent);font-weight:700">${e.days_present}</td>
+                  <td style="color:var(--primary);font-weight:700">${_fmtHours(e.total_work_minutes)}</td>
+                  <td>${e.days_late > 0 ? `<span style="color:var(--warning)">${e.days_late}</span>` : '—'}</td>
+                  <td>${e.total_late_minutes > 0 ? `<span style="color:var(--warning)">${e.total_late_minutes} мин</span>` : '—'}</td>
+                  <td>${e.days_absent > 0 ? `<span style="color:var(--error)">${e.days_absent}</span>` : '—'}</td>
+                  <td>${e.days_approved_absence > 0 ? `<span style="color:var(--primary)">${e.days_approved_absence}</span>` : '—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      ${dailyDetail.length ? `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 Детали за ${_repFmtDate(detailDate)}</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Сотрудник</th><th>Отдел</th>
+              <th>Приход</th><th>Уход</th><th>Часы</th>
+              <th>Статус</th><th>Опоздание</th>
+            </tr></thead>
+            <tbody>${dailyDetail.map(d => `
               <tr>
-                <td style="font-weight:700">${d.full_name}</td>
+                <td style="font-weight:700">${d.employee_name||d.full_name||'—'}</td>
                 <td>${d.team_name||'—'}</td>
                 <td style="color:var(--accent)">${d.check_in_time||'—'}</td>
                 <td style="color:var(--error)">${d.check_out_time||'—'}</td>
+                <td style="color:var(--primary)">${d.work_duration||'—'}</td>
                 <td>${statusBadge(d.status)}</td>
                 <td>${d.late_minutes>0 ? `<span style="color:var(--warning)">${d.late_minutes} мин</span>` : '—'}</td>
               </tr>`).join('')}
             </tbody>
           </table>
         </div>
-      </div>`;
+      </div>` : ''}
+    `;
+
+    renderAttendanceChart(data.chart_data);
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-async function loadMonthlyReport() {
-  const now = new Date();
+async function loadEmployeeReport() {
+  const start  = document.getElementById('repStartDate').value;
+  const end    = document.getElementById('repEndDate').value;
+  const userId = document.getElementById('repEmployeeId').value;
+
+  if (!userId) {
+    document.getElementById('reportContent').innerHTML =
+      `<div class="card" style="text-align:center;padding:48px;color:var(--text-muted)">Выберите сотрудника</div>`;
+    return;
+  }
+
+  document.getElementById('reportContent').innerHTML =
+    `<div style="text-align:center;padding:48px;color:var(--text-muted)">Загрузка…</div>`;
+
   try {
-    const r = await apiFetch(`/reports/monthly?year=${now.getFullYear()}&month=${now.getMonth()+1}`);
+    let url = `/reports/employee/${userId}`;
+    const params = [];
+    if (start) params.push(`start_date=${start}`);
+    if (end)   params.push(`end_date=${end}`);
+    if (params.length) url += '?' + params.join('&');
+
+    const data = await apiFetch(url);
+    const s = data.stats;
+
     document.getElementById('reportContent').innerHTML = `
+      ${_repStatCards([
+        ['Дней присутствовал', s.days_present,        'var(--accent)'],
+        ['Дней опоздал',       s.days_late,            'var(--warning)'],
+        ['Опоздание (мин)',    s.total_late_minutes,   'var(--warning)'],
+        ['Часов работал',      _fmtHours(s.total_work_minutes), 'var(--primary)'],
+      ])}
+
       <div class="card">
-        <div class="card-header"><div class="card-title">Месячный отчёт — ${r.period}</div></div>
+        <div class="card-header">
+          <div>
+            <div class="card-title">${data.full_name}</div>
+            <div class="card-sub">${start||''} — ${end||''}</div>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Сотрудник</th><th>Отдел</th><th>Дней присут.</th><th>Опоздал (дней)</th><th>Итого опозд. (мин)</th></tr></thead>
-            <tbody>${r.employees.map(e => `
-              <tr>
-                <td style="font-weight:700">${e.full_name}</td>
-                <td>${e.team_name||'—'}</td>
-                <td style="color:var(--accent); font-weight:700">${e.days_present}</td>
-                <td style="color:var(--warning)">${e.days_late}</td>
-                <td>${e.total_late_minutes>0 ? `<span style="color:var(--warning)">${e.total_late_minutes} мин</span>` : '—'}</td>
-              </tr>`).join('')}
+            <thead><tr>
+              <th>Дата</th><th>Приход</th><th>Уход</th><th>Часы</th>
+              <th>Статус</th><th>Опоздание</th><th>Примечание</th>
+            </tr></thead>
+            <tbody>${!data.records.length
+              ? '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Нет записей за период</td></tr>'
+              : data.records.map(r => `
+                <tr>
+                  <td style="font-weight:700">${_repFmtDate(r.date)}</td>
+                  <td style="color:var(--accent)">${r.check_in||'—'}</td>
+                  <td style="color:var(--error)">${r.check_out||'—'}</td>
+                  <td style="color:var(--primary)">${r.work_duration||'—'}</td>
+                  <td>${statusBadge(r.status)}</td>
+                  <td>${r.late_minutes>0 ? `<span style="color:var(--warning)">${r.late_minutes} мин</span>` : '—'}</td>
+                  <td style="color:var(--text-sub);font-size:12px;font-weight:400">${r.note||'—'}</td>
+                </tr>`).join('')}
             </tbody>
           </table>
         </div>
-      </div>`;
+      </div>
+    `;
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+function renderAttendanceChart(chartData) {
+  if (reportChart) { reportChart.destroy(); reportChart = null; }
+  const canvas = document.getElementById('reportChartCanvas');
+  if (!canvas || !chartData?.length) return;
+
+  const labels  = chartData.map(d => _repFmtDate(d.date));
+  reportChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Присутствовали',
+          data: chartData.map(d => d.present),
+          backgroundColor: 'rgba(6,214,160,0.8)',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+        {
+          label: 'Отсутствовали',
+          data: chartData.map(d => d.absent),
+          backgroundColor: 'rgba(239,35,60,0.7)',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+        {
+          label: 'Опоздали',
+          data: chartData.map(d => d.late),
+          backgroundColor: 'rgba(255,183,3,0.85)',
+          borderRadius: 6,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            font: { family: 'Inter', size: 12, weight: '600' },
+            usePointStyle: true, pointStyle: 'circle', padding: 16,
+          },
+        },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} чел.` },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { family: 'Inter', size: 11 } },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, font: { family: 'Inter', size: 11 } },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+      },
+    },
+  });
 }
 
 
@@ -1455,7 +1720,7 @@ function statusBadge(s) {
     approved_absence: ['badge-approved-absence', '✓ Разрешённое отсутствие'],
   };
 
-  const [cls, lbl] = map[s] || ['badge-absent', s];
+  const [cls, lbl] = map[s?.toLowerCase()] || ['badge-absent', s];
   return `<span class="badge ${cls}">${lbl}</span>`;
 }
 
@@ -1526,13 +1791,13 @@ async function loadAuditLog() {
     tbody.innerHTML = filtered.map(log => {
       const ts = log.created_at ? new Date(log.created_at).toLocaleString('ru-RU') : '—';
       const actor = log.actor_name || log.actor_id || '—';
-      const newVal = log.new_value ? JSON.stringify(log.new_value, null, 0).slice(0, 120) : '—';
+      const newVal = formatAuditDetail(log.new_value);
       return `<tr>
         <td style="white-space:nowrap;font-size:12px">${ts}</td>
         <td>${escHtml(actor)}</td>
         <td><span class="badge" style="background:rgba(24,119,242,.1);color:var(--primary);font-size:11px;padding:2px 8px;border-radius:6px">${escHtml(log.action || '—')}</span></td>
         <td style="font-size:12px">${escHtml(log.entity || '—')} ${log.entity_id ? '<span style="opacity:.5;font-size:10px">' + String(log.entity_id).slice(0,8) + '…</span>' : ''}</td>
-        <td style="font-size:11px;color:var(--text-sub);max-width:300px;word-break:break-all">${escHtml(newVal)}</td>
+        <td style="font-size:11px;color:var(--text-sub);max-width:300px">${newVal}</td>
       </tr>`;
     }).join('');
   } catch (e) {
@@ -1543,6 +1808,29 @@ async function loadAuditLog() {
 function escHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatAuditDetail(val) {
+  if (val == null) return '—';
+  let obj = val;
+  if (typeof val === 'string') {
+    try { obj = JSON.parse(val); } catch (_) { return escHtml(String(val).slice(0, 120)); }
+  }
+  if (typeof obj === 'object' && !Array.isArray(obj)) {
+    return Object.entries(obj)
+      .filter(([,v]) => v != null && v !== '')
+      .map(([k, v]) => `<span style="color:var(--text-muted)">${escHtml(k)}:</span> <b>${escHtml(String(v))}</b>`)
+      .join(' &nbsp;·&nbsp; ');
+  }
+  return escHtml(JSON.stringify(obj).slice(0, 120));
+}
+
+// ── Global search (filters visible table rows by name) ───────────────────────
+function handleGlobalSearch(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('tbody tr').forEach(row => {
+    row.style.display = q && !row.textContent.toLowerCase().includes(q) ? 'none' : '';
+  });
 }
 
 // Init

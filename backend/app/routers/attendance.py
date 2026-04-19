@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from typing import Union
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.attendance import Attendance, AttendanceStatus
 from app.schemas.attendance import (
     CheckInRequest,
@@ -320,6 +320,9 @@ def who_is_in_office(
 ):
     """Кто сейчас в офисе: check_in есть, check_out нет, статус PRESENT или LATE (ТЗ §2.5)."""
     today = date.today()
+    admin_ids = db.query(User.id).filter(
+        User.role.in_([UserRole.ADMIN, UserRole.SUPER_ADMIN])
+    ).subquery()
     rows = (
         db.query(Attendance)
         .filter(
@@ -327,6 +330,7 @@ def who_is_in_office(
             Attendance.check_in_time.isnot(None),
             Attendance.check_out_time.is_(None),
             Attendance.status.in_([AttendanceStatus.PRESENT, AttendanceStatus.LATE]),
+            Attendance.user_id.notin_(admin_ids),
         )
         .all()
     )

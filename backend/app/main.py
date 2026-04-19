@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,7 +91,7 @@ os.makedirs(_uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=_uploads_dir), name="uploads")
 
 
-def _resolve_admin_web_dir() -> str | None:
+def _resolve_admin_web_dir() -> Optional[str]:
     """Папка admin_web: .env ADMIN_WEB_DIR или рядом с backend в репозитории / в образе."""
     explicit = os.getenv("ADMIN_WEB_DIR", "").strip()
     if explicit:

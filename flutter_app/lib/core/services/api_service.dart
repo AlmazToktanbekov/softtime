@@ -306,8 +306,9 @@ class ApiService {
     return response.data;
   }
 
-  Future<Map<String, dynamic>> getWeeklyReport() async {
-    final response = await dio.get('/reports/weekly');
+  Future<Map<String, dynamic>> getWeeklyReport({String? weekStart}) async {
+    final params = weekStart != null ? {'week_start': weekStart} : null;
+    final response = await dio.get('/reports/weekly', queryParameters: params);
     return response.data;
   }
 
@@ -315,6 +316,19 @@ class ApiService {
     final response = await dio.get('/reports/monthly', queryParameters: {
       'year': year, 'month': month
     });
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getEmployeeReport(
+    String userId, {
+    String? startDate,
+    String? endDate,
+  }) async {
+    final params = <String, dynamic>{};
+    if (startDate != null) params['start_date'] = startDate;
+    if (endDate != null) params['end_date'] = endDate;
+    final response = await dio.get('/reports/employee/$userId',
+        queryParameters: params.isEmpty ? null : params);
     return response.data;
   }
 
@@ -375,6 +389,11 @@ class ApiService {
       'target_user_id': targetUserId,
       if (targetAssignmentId != null) 'target_assignment_id': targetAssignmentId,
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getDutyColleagues() async {
+    final response = await dio.get('/duty/colleagues');
+    return (response.data as List).cast<Map<String, dynamic>>();
   }
 
   Future<List<DutyAssignment>> getPeerDutyAssignments(String userId, {String? fromDate}) async {

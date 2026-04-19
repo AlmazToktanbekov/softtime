@@ -64,11 +64,19 @@ def daily_report(
     if not report_date:
         report_date = date.today()
 
-    records = db.query(Attendance).filter(Attendance.date == report_date).all()
-    emp_q = db.query(User).filter(User.status == UserStatus.ACTIVE, User.deleted_at.is_(None))
+    emp_q = db.query(User).filter(
+        User.status == UserStatus.ACTIVE,
+        User.deleted_at.is_(None),
+        User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+    )
     if current_user.role == UserRole.TEAM_LEAD and current_user.team_name:
         emp_q = emp_q.filter(User.team_name == current_user.team_name)
     employees = emp_q.all()
+    emp_ids = {e.id for e in employees}
+    records = db.query(Attendance).filter(
+        Attendance.date == report_date,
+        Attendance.user_id.in_(emp_ids),
+    ).all()
 
     # Автоматически закрываем незавершённые записи прошлых дней
     now = datetime.now()
@@ -106,14 +114,21 @@ def weekly_report(
         week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
 
-    records = db.query(Attendance).filter(
-        Attendance.date >= week_start, Attendance.date <= week_end
-    ).all()
-
-    emp_q = db.query(User).filter(User.status == UserStatus.ACTIVE, User.deleted_at.is_(None))
+    emp_q = db.query(User).filter(
+        User.status == UserStatus.ACTIVE,
+        User.deleted_at.is_(None),
+        User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+    )
     if current_user.role == UserRole.TEAM_LEAD and current_user.team_name:
         emp_q = emp_q.filter(User.team_name == current_user.team_name)
     employees = emp_q.all()
+    emp_ids = {e.id for e in employees}
+
+    records = db.query(Attendance).filter(
+        Attendance.date >= week_start,
+        Attendance.date <= week_end,
+        Attendance.user_id.in_(emp_ids),
+    ).all()
 
     days_count = (week_end - week_start).days + 1
     daily = {}
@@ -151,14 +166,21 @@ def monthly_report(
     else:
         month_end = date(year, month + 1, 1) - timedelta(days=1)
 
-    records = db.query(Attendance).filter(
-        Attendance.date >= month_start, Attendance.date <= month_end
-    ).all()
-
-    emp_q = db.query(User).filter(User.status == UserStatus.ACTIVE, User.deleted_at.is_(None))
+    emp_q = db.query(User).filter(
+        User.status == UserStatus.ACTIVE,
+        User.deleted_at.is_(None),
+        User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+    )
     if current_user.role == UserRole.TEAM_LEAD and current_user.team_name:
         emp_q = emp_q.filter(User.team_name == current_user.team_name)
     employees = emp_q.all()
+    emp_ids = {e.id for e in employees}
+
+    records = db.query(Attendance).filter(
+        Attendance.date >= month_start,
+        Attendance.date <= month_end,
+        Attendance.user_id.in_(emp_ids),
+    ).all()
 
     emp_summary = []
     for emp in employees:
@@ -270,6 +292,94 @@ def employee_report(
     }
 
 
+# ─── Period (arbitrary date range) ──────────────────────────────────────────
+
+@router.get("/period")
+def period_report(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    user_id: Optional[UUID] = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_teamlead),
+):
+    """Отчёт за произвольный период: данные для графика + сводка по сотрудникам."""
+    today = date.today()
+    if not start_date:
+        start_date = today - timedelta(days=6)
+    if not end_date:
+        end_date = today
+
+    emp_q = db.query(User).filter(
+        User.status == UserStatus.ACTIVE,
+        User.deleted_at.is_(None),
+        User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+    )
+    if current_user.role == UserRole.TEAM_LEAD and current_user.team_name:
+        emp_q = emp_q.filter(User.team_name == current_user.team_name)
+    if user_id:
+        emp_q = emp_q.filter(User.id == user_id)
+    employees = emp_q.all()
+    emp_ids = {e.id for e in employees}
+
+    records = (
+        db.query(Attendance).filter(
+            Attendance.date >= start_date,
+            Attendance.date <= end_date,
+            Attendance.user_id.in_(emp_ids),
+        ).all()
+        if emp_ids else []
+    )
+
+    # Chart data — one entry per day
+    total_days = (end_date - start_date).days + 1
+    chart_data = []
+    for i in range(total_days):
+        d = start_date + timedelta(days=i)
+        day_recs = [r for r in records if r.date == d]
+        present = sum(1 for r in day_recs if r.check_in_time)
+        absent = len(employees) - present
+        late = sum(1 for r in day_recs if (r.late_minutes or 0) > 0)
+        approved = sum(1 for r in day_recs if r.status == AttendanceStatus.APPROVED_ABSENCE)
+        chart_data.append({
+            "date": str(d),
+            "present": present,
+            "absent": max(absent, 0),
+            "late": late,
+            "approved_absence": approved,
+        })
+
+    # Per-employee summary
+    emp_summary = []
+    for emp in employees:
+        emp_records = [r for r in records if r.user_id == emp.id]
+        days_present = sum(1 for r in emp_records if r.check_in_time)
+        days_absent = sum(1 for r in emp_records if r.status == AttendanceStatus.ABSENT)
+        days_late = sum(1 for r in emp_records if (r.late_minutes or 0) > 0)
+        days_approved = sum(1 for r in emp_records if r.status == AttendanceStatus.APPROVED_ABSENCE)
+        total_late_min = sum((r.late_minutes or 0) for r in emp_records)
+        total_work_min = sum((r.work_minutes or 0) for r in emp_records if r.work_minutes)
+        emp_summary.append({
+            "user_id": str(emp.id),
+            "full_name": emp.full_name,
+            "team_name": getattr(emp, "team_name", None),
+            "days_present": days_present,
+            "days_absent": days_absent,
+            "days_late": days_late,
+            "days_approved_absence": days_approved,
+            "total_late_minutes": total_late_min,
+            "total_work_minutes": total_work_min,
+        })
+    emp_summary.sort(key=lambda x: x["total_work_minutes"], reverse=True)
+
+    return {
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "chart_data": chart_data,
+        "employees": emp_summary,
+        "summary": _build_summary(records, employees),
+    }
+
+
 # ─── Department ───────────────────────────────────────────────────────────────
 
 @router.get("/department")
@@ -291,6 +401,7 @@ def department_report(
             User.team_name == department,
             User.status == UserStatus.ACTIVE,
             User.deleted_at.is_(None),
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
         )
         .all()
     )

@@ -26,7 +26,7 @@ def list_networks(
 def create_network(
     data: OfficeNetworkCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     network = OfficeNetwork(**data.model_dump())
     db.add(network)
@@ -40,7 +40,7 @@ def update_network(
     network_id: int,
     data: OfficeNetworkCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     network = db.query(OfficeNetwork).filter(OfficeNetwork.id == network_id).first()
     if not network:
@@ -56,7 +56,7 @@ def update_network(
 def activate_network(
     network_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     network = db.query(OfficeNetwork).filter(OfficeNetwork.id == network_id).first()
     if not network:
@@ -77,7 +77,7 @@ def activate_network(
 def deactivate_network(
     network_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     network = db.query(OfficeNetwork).filter(OfficeNetwork.id == network_id).first()
     if not network:
@@ -98,7 +98,7 @@ def deactivate_network(
 def delete_network(
     network_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     """Полное удаление сети (ТЗ: конфигурация офисных сетей)."""
     network = db.query(OfficeNetwork).filter(OfficeNetwork.id == network_id).first()
@@ -195,7 +195,7 @@ def verify_qr(
 def activate_qr_token(
     token_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     """Сделать выбранный QR активным (остальные деактивируются)."""
     qr = db.query(QRToken).filter(QRToken.id == token_id).first()
@@ -221,7 +221,7 @@ def activate_qr_token(
 def deactivate_qr_token(
     token_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     qr = db.query(QRToken).filter(QRToken.id == token_id).first()
     if not qr:
@@ -242,7 +242,7 @@ def deactivate_qr_token(
 def delete_qr_token(
     token_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_teamlead),
+    current_user: User = Depends(require_admin),
 ):
     qr = db.query(QRToken).filter(QRToken.id == token_id).first()
     if not qr:

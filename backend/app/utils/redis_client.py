@@ -2,12 +2,18 @@
 Redis helper for:
   - JWT blacklist (logout / token rotation)
   - Brute-force login protection
+
+Redis is optional: if unavailable, all checks degrade gracefully
+(tokens are not blacklisted, brute-force protection is disabled).
 """
+import logging
 from typing import Optional
 
 import redis
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 _pool: Optional[redis.ConnectionPool] = None
 
@@ -23,20 +29,34 @@ def _get_pool() -> redis.ConnectionPool:
     return _pool
 
 
-def get_redis() -> redis.Redis:
-    return redis.Redis(connection_pool=_get_pool())
+def get_redis() -> Optional[redis.Redis]:
+    try:
+        r = redis.Redis(connection_pool=_get_pool())
+        r.ping()
+        return r
+    except Exception:
+        return None
 
 
 # ── Token blacklist ────────────────────────────────────────────────────────────
 
 def blacklist_token(jti: str, ttl_seconds: int) -> None:
-    """Mark a token as invalid for the remainder of its lifetime."""
-    if ttl_seconds > 0:
-        get_redis().setex(f"bl:{jti}", ttl_seconds, "1")
+    r = get_redis()
+    if r and ttl_seconds > 0:
+        try:
+            r.setex(f"bl:{jti}", ttl_seconds, "1")
+        except Exception:
+            logger.warning("Redis unavailable: token blacklist skipped")
 
 
 def is_token_blacklisted(jti: str) -> bool:
-    return bool(get_redis().exists(f"bl:{jti}"))
+    r = get_redis()
+    if not r:
+        return False
+    try:
+        return bool(r.exists(f"bl:{jti}"))
+    except Exception:
+        return False
 
 
 # ── Brute-force protection ─────────────────────────────────────────────────────
@@ -50,19 +70,35 @@ def _bf_key(username: str) -> str:
 
 
 def is_login_blocked(username: str) -> bool:
-    val = get_redis().get(_bf_key(username))
-    return bool(val and int(val) >= _MAX_ATTEMPTS)
+    r = get_redis()
+    if not r:
+        return False
+    try:
+        val = r.get(_bf_key(username))
+        return bool(val and int(val) >= _MAX_ATTEMPTS)
+    except Exception:
+        return False
 
 
 def record_failed_attempt(username: str) -> int:
-    """Increment counter. Returns new count. Sets expiry on first hit."""
-    key = _bf_key(username)
     r = get_redis()
-    count = r.incr(key)
-    if count == 1:
-        r.expire(key, _BLOCK_SECONDS)
-    return count
+    if not r:
+        return 0
+    try:
+        key = _bf_key(username)
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, _BLOCK_SECONDS)
+        return count
+    except Exception:
+        return 0
 
 
 def clear_failed_attempts(username: str) -> None:
-    get_redis().delete(_bf_key(username))
+    r = get_redis()
+    if not r:
+        return
+    try:
+        r.delete(_bf_key(username))
+    except Exception:
+        pass

@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,7 @@ from app.utils.dependencies import get_current_user, require_admin, require_admi
 from app.utils.audit import write_audit
 from app.utils.fcm import notify_user, notify_users
 from app.services.qr_service import validate_qr_token
+from app.services.ip_service import get_client_ip, validate_office_network
 from app.services.duty_service import (
     submit_duty_completion,
     verify_duty_completion,
@@ -66,6 +67,7 @@ def reorder_queue(
             User.id.in_(body.user_ids),
             User.deleted_at.is_(None),
             User.status == UserStatus.ACTIVE,
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
         )
         .all()
     )
@@ -368,10 +370,11 @@ def get_my_duty_assignments(
 def complete_duty(
     assignment_id: UUID,
     data: DutyCompletionSubmit,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Сотрудник отмечает выполнение дежурства (чек-лист + QR)."""
+    """Сотрудник отмечает выполнение дежурства (чек-лист + QR + офисная сеть)."""
     assignment = db.query(DutyAssignment).filter(DutyAssignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Назначение не найдено")
@@ -381,6 +384,16 @@ def complete_duty(
         UserRole.SUPER_ADMIN,
     ):
         raise HTTPException(status_code=403, detail="Вы не ответственны за это дежурство")
+
+    # Проверка офисной сети (только для сотрудников, не для админов)
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        ip_address = get_client_ip(request)
+        network_valid, _ = validate_office_network(ip_address, db)
+        if not network_valid:
+            raise HTTPException(
+                status_code=403,
+                detail="Подтверждение дежурства возможно только из офисной сети",
+            )
 
     qr_valid, qr_msg = validate_qr_token(data.qr_token, db, expected_type="duty")
     if not qr_valid:
@@ -546,6 +559,35 @@ def delete_checklist_item(
 
 
 # ============ Duty Swaps ============
+
+
+class ColleagueItem(BaseModel):
+    id: str
+    full_name: str
+    role: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/colleagues", response_model=List[ColleagueItem])
+def list_colleagues(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Список активных сотрудников для выбора при запросе обмена дежурством."""
+    rows = (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.status == UserStatus.ACTIVE,
+            User.deleted_at.is_(None),
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+        )
+        .order_by(User.full_name)
+        .all()
+    )
+    return [ColleagueItem(id=str(r.id), full_name=r.full_name, role=r.role.value) for r in rows]
 
 
 @router.get("/peer/{user_id}/assignments", response_model=List[DutyAssignmentResponse])

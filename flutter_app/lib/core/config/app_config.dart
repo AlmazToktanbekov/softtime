@@ -1,9 +1,7 @@
 class AppConfig {
-  // ── Продакшн URL (задеплоенный сервер) ──────────────────────────────────────
-  // Когда задеплоите на Railway/VPS — вставьте сюда постоянный URL:
-  // static const String _productionUrl = 'https://your-app.railway.app';
-
-  // ── Дефолтный URL (можно переопределить через диалог в приложении) ──────────
+  // ── Продакшн URL ─────────────────────────────────────────────────────────────
+  // Задаётся при сборке через --dart-define=API_BASE_URL=https://your-server.com/api/v1
+  // Или замените defaultValue на URL вашего сервера перед сборкой APK/IPA.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://192.168.50.12:8000',

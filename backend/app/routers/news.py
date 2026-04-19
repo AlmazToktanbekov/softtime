@@ -154,7 +154,11 @@ def get_news_readers(
 
     active_users = (
         db.query(User)
-        .filter(User.deleted_at.is_(None), User.status == UserStatus.ACTIVE)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+        )
         .all()
     )
 
@@ -184,7 +188,11 @@ def get_news_stats(
 
     total = (
         db.query(User)
-        .filter(User.deleted_at.is_(None), User.status == UserStatus.ACTIVE)
+        .filter(
+            User.deleted_at.is_(None),
+            User.status == UserStatus.ACTIVE,
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+        )
         .count()
     )
     read_count = db.query(NewsRead).filter(NewsRead.news_id == news_id).count()

@@ -15,6 +15,14 @@ import '../../../core/services/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/status_badge.dart';
 
+// ─── Colors ───────────────────────────────────────────────────────────────────
+const _kTeal   = Color(0xFF06D6A0);
+const _kOrange = Color(0xFFFF8C42);
+const _kCard1  = Color(0xFF4361EE);
+const _kCard2  = Color(0xFF3BC9A0);
+const _kCard3  = Color(0xFFFF6B6B);
+const _kBg     = Color(0xFFEEF0F8);
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -22,26 +30,91 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  AttendanceModel? _today;
-  List<DutyAssignment> _todayDuties = [];
-  List<News> _news = [];
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with TickerProviderStateMixin {
+  // ── data ──────────────────────────────────────────────────────────────────
+  AttendanceModel?            _today;
+  List<DutyAssignment>        _todayDuties = [];
+  List<News>                  _news = [];
   List<EmployeeScheduleModel> _schedules = [];
+  List<DutySwap>              _incomingSwaps = [];
 
-  bool _loadingAttendance = true;
-  bool _loadingDuty = true;
-  bool _loadingNews = true;
-  bool _loadingSchedule = true;
-  bool _actionLoading = false;
+  bool   _loadingAttendance = true;
+  bool   _loadingDuty       = true;
+  bool   _loadingNews       = true;
+  bool   _loadingSchedule   = true;
+  bool   _actionLoading     = false;
   String? _error;
 
   Timer? _timer;
 
+  // ── animations ────────────────────────────────────────────────────────────
+  late AnimationController _headerCtrl;
+  late AnimationController _cardsCtrl;
+  late AnimationController _sectionsCtrl;
+
+  late Animation<double>   _headerFade;
+  late Animation<Offset>   _headerSlide;
+
+  late Animation<double>   _cardsFade;
+  late Animation<Offset>   _cardsSlide;
+
+  late List<Animation<double>>  _sectionFades;
+  late List<Animation<Offset>>  _sectionSlides;
+
   @override
   void initState() {
     super.initState();
+
+    // header
+    _headerCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
+    _headerFade  = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
+    _headerSlide = Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
+
+    // stat cards
+    _cardsCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _cardsFade  = CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOut);
+    _cardsSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOutCubic));
+
+    // sections (staggered)
+    _sectionsCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 800));
+
+    _sectionFades = List.generate(5, (i) {
+      final start = 0.1 * i;
+      return Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
+          parent: _sectionsCtrl,
+          curve: Interval(start, (start + 0.5).clamp(0, 1), curve: Curves.easeOut),
+        ),
+      );
+    });
+
+    _sectionSlides = List.generate(5, (i) {
+      final start = 0.1 * i;
+      return Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _sectionsCtrl,
+          curve: Interval(start, (start + 0.5).clamp(0, 1), curve: Curves.easeOutCubic),
+        ),
+      );
+    });
+
+    // kick off animations
+    _headerCtrl.forward();
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _cardsCtrl.forward();
+    });
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) _sectionsCtrl.forward();
+    });
+
     _loadAll();
-    // Живой таймер для рабочего времени
+
     _timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
@@ -49,24 +122,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _headerCtrl.dispose();
+    _cardsCtrl.dispose();
+    _sectionsCtrl.dispose();
     _timer?.cancel();
     super.dispose();
   }
 
+  // ── load ──────────────────────────────────────────────────────────────────
   Future<void> _loadAll() async {
     _loadAttendance();
     _loadDuty();
     _loadNews();
     _loadSchedule();
+    _loadIncomingSwaps();
+  }
+
+  Future<void> _loadIncomingSwaps() async {
+    try {
+      final swaps = await ref.read(apiServiceProvider).getIncomingSwaps();
+      if (mounted) {
+        setState(() => _incomingSwaps = swaps.where((s) => s.status == 'pending').toList());
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAttendance() async {
     setState(() => _loadingAttendance = true);
     try {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final api = ref.read(apiServiceProvider);
-      final records = await api.getMyAttendance(startDate: today, endDate: today);
-      if (mounted) setState(() => _today = records.isNotEmpty ? records.first : null);
+      final api   = ref.read(apiServiceProvider);
+      final recs  = await api.getMyAttendance(startDate: today, endDate: today);
+      if (mounted) setState(() => _today = recs.isNotEmpty ? recs.first : null);
     } catch (e) {
       if (mounted) setState(() => _error = _parseError(e));
     } finally {
@@ -77,8 +164,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _loadDuty() async {
     setState(() => _loadingDuty = true);
     try {
-      final api = ref.read(apiServiceProvider);
-      final duties = await api.getTodayDuties();
+      final duties = await ref.read(apiServiceProvider).getTodayDuties();
       if (mounted) setState(() => _todayDuties = duties);
     } catch (_) {
     } finally {
@@ -89,9 +175,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _loadNews() async {
     setState(() => _loadingNews = true);
     try {
-      final api = ref.read(apiServiceProvider);
-      final news = await api.getNews();
-      if (mounted) setState(() => _news = news.take(2).toList());
+      final news = await ref.read(apiServiceProvider).getNews();
+      if (mounted) setState(() => _news = news.take(3).toList());
     } catch (_) {
     } finally {
       if (mounted) setState(() => _loadingNews = false);
@@ -101,11 +186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _loadSchedule() async {
     setState(() => _loadingSchedule = true);
     try {
-      final auth = ref.read(authProvider);
-      final userId = auth.user?.id;
-      if (userId == null) return;
-      final api = ref.read(apiServiceProvider);
-      final s = await api.getEmployeeSchedules(userId);
+      final uid = ref.read(authProvider).user?.id;
+      if (uid == null) return;
+      final s = await ref.read(apiServiceProvider).getEmployeeSchedules(uid);
       if (mounted) setState(() => _schedules = s);
     } catch (_) {
     } finally {
@@ -118,10 +201,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (result == null || !mounted) return;
     setState(() => _actionLoading = true);
     try {
-      final record = await ref.read(apiServiceProvider).checkIn(result);
+      final rec = await ref.read(apiServiceProvider).checkIn(result);
       if (!mounted) return;
-      setState(() { _today = record; _actionLoading = false; });
-      _showSnack('Приход отмечен!', AppColors.success);
+      setState(() { _today = rec; _actionLoading = false; });
+      _showSnack('Приход отмечен! ✓', AppColors.success);
     } catch (e) {
       if (!mounted) return;
       setState(() => _actionLoading = false);
@@ -134,9 +217,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (result == null || !mounted) return;
     setState(() => _actionLoading = true);
     try {
-      final record = await ref.read(apiServiceProvider).checkOut(result);
+      final rec = await ref.read(apiServiceProvider).checkOut(result);
       if (!mounted) return;
-      setState(() { _today = record; _actionLoading = false; });
+      setState(() { _today = rec; _actionLoading = false; });
       _showSnack('Уход отмечен!', AppColors.primary);
     } catch (e) {
       if (!mounted) return;
@@ -157,207 +240,187 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _showSnack(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+      content: Text(msg,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter')),
       backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ));
   }
 
-  // Сегодняшнее расписание (0=Пн … 6=Вс)
   EmployeeScheduleModel? get _todaySchedule {
     final dow = DateTime.now().weekday - 1;
-    try {
-      return _schedules.firstWhere((s) => s.dayOfWeek == dow);
-    } catch (_) {
-      return null;
-    }
+    try { return _schedules.firstWhere((s) => s.dayOfWeek == dow); }
+    catch (_) { return null; }
   }
 
-  bool _isMyLunchDutyToday(String? userId) {
-    if (userId == null) return false;
-    return _todayDuties.any((d) => d.userId == userId && d.isLunch);
-  }
+  bool _isMyDutyToday(String? uid) =>
+      uid != null && _todayDuties.any((d) => d.userId == uid && d.isLunch);
 
   String _liveWorkTime() {
     if (_today?.checkInTime == null) return '';
     final inDt = DateTime.parse(_today!.checkInTime!).toLocal();
-    final now = DateTime.now();
-    final diff = now.difference(inDt);
+    final diff  = DateTime.now().difference(inDt);
     if (diff.isNegative) return '';
-    final h = diff.inHours;
-    final m = diff.inMinutes % 60;
+    final h = diff.inHours, m = diff.inMinutes % 60;
     return h > 0 ? '$h ч $m м' : '$m м';
   }
 
+  // ── build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authProvider);
-    final user = auth.user;
-    final now = DateTime.now();
-    final greeting = now.hour < 12 ? 'Доброе утро' : now.hour < 18 ? 'Добрый день' : 'Добрый вечер';
+    final auth      = ref.watch(authProvider);
+    final user      = auth.user;
+    final now       = DateTime.now();
+    final greeting  = now.hour < 12 ? 'Доброе утро' : now.hour < 17 ? 'Добрый день' : 'Добрый вечер';
     final firstName = user?.fullName?.split(' ').first ?? 'Сотрудник';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: _kBg,
       body: RefreshIndicator(
         color: AppColors.primary,
+        displacement: 80,
         onRefresh: () async {
           setState(() => _error = null);
+          _headerCtrl.forward(from: 0);
+          _cardsCtrl.forward(from: 0);
+          _sectionsCtrl.forward(from: 0);
           await _loadAll();
         },
         child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── App Bar ──────────────────────────────────────────────────
-            SliverAppBar(
-              floating: true,
-              snap: true,
-              backgroundColor: AppColors.surface,
-              surfaceTintColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              elevation: 0,
-              titleSpacing: 20,
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(greeting,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Inter')),
-                  Text(firstName,
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Inter')),
-                ],
-              ),
-              actions: [
-                if (auth.isAdmin)
-                  IconButton(
-                    icon: const Icon(Icons.admin_panel_settings_outlined),
-                    onPressed: () => context.push('/home/admin'),
-                    tooltip: 'Панель Admin',
-                  ),
-                GestureDetector(
-                  onTap: () => context.push('/home/profile'),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 16),
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryLight,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            fontFamily: 'Inter'),
-                      ),
-                    ),
+            // ── HEADER ──────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: FadeTransition(
+                opacity: _headerFade,
+                child: SlideTransition(
+                  position: _headerSlide,
+                  child: _Header(
+                    greeting: greeting,
+                    firstName: firstName,
+                    avatarUrl: ref.read(apiServiceProvider).mediaAbsoluteUrl(user?.avatarUrl),
+                    isAdmin: auth.isAdmin,
+                    onAvatar: () => context.push('/home/profile'),
+                    onAdmin:  () => context.push('/home/admin'),
+                    now: now,
                   ),
                 ),
-              ],
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Container(height: 1, color: AppColors.divider),
               ),
             ),
 
+            // ── QUICK STAT CARDS ─────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: FadeTransition(
+                opacity: _cardsFade,
+                child: SlideTransition(
+                  position: _cardsSlide,
+                  child: _QuickStatsRow(
+                    today: _today,
+                    loading: _loadingAttendance,
+                    dutiesCount: _todayDuties.length,
+                    newsCount: _news.length,
+                    onAttendance: () {},
+                    onDuty: () => context.go('/duty'),
+                    onNews: () => context.go('/news'),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── BODY SECTIONS ────────────────────────────────────────────────
             SliverPadding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // ── Ошибка сети ────────────────────────────────────────
+
+                  // error banner
                   if (_error != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: AppColors.error.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.wifi_off_rounded,
-                              color: AppColors.error, size: 18),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.error,
-                                  fontFamily: 'Inter'),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() => _error = null);
-                              _loadAll();
-                            },
-                            child: const Text('Повтор',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.error)),
-                          ),
-                        ],
+                    const SizedBox(height: 16),
+                    _AnimatedSection(
+                      fade: _sectionFades[0], slide: _sectionSlides[0],
+                      child: _ErrorBanner(
+                        message: _error!,
+                        onRetry: () { setState(() => _error = null); _loadAll(); },
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
 
-                  // ── Дата ──────────────────────────────────────────────
-                  _DateBanner(now: now),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ── Посещаемость ───────────────────────────────────────
-                  _AttendanceCard(
-                    record: _today,
-                    loading: _loadingAttendance,
-                    actionLoading: _actionLoading,
-                    schedule: _todaySchedule,
-                    liveTime: _liveWorkTime(),
-                    onCheckIn: _onCheckIn,
-                    onCheckOut: _onCheckOut,
-                    enableCheckInOut: !auth.isAdmin,
-                  ),
-                  const SizedBox(height: 16),
-
-                  if (_isMyLunchDutyToday(user?.id)) ...[
-                    _LunchDutyCallout(onOpen: () => context.go('/duty')),
-                    const SizedBox(height: 16),
+                  // duty callout
+                  if (_isMyDutyToday(user?.id)) ...[
+                    _AnimatedSection(
+                      fade: _sectionFades[0], slide: _sectionSlides[0],
+                      child: _DutyCalloutCard(onOpen: () => context.go('/duty')),
+                    ),
+                    const SizedBox(height: 14),
                   ],
 
-                  // ── Дежурство ──────────────────────────────────────────
-                  _DutySectionHome(
-                    duties: _todayDuties,
-                    loading: _loadingDuty,
-                    currentUserId: user?.id,
-                    onOpen: () => context.go('/duty'),
-                  ),
-                  const SizedBox(height: 16),
+                  // incoming swap requests banner
+                  if (_incomingSwaps.isNotEmpty) ...[
+                    _AnimatedSection(
+                      fade: _sectionFades[0], slide: _sectionSlides[0],
+                      child: _SwapRequestBanner(
+                        swaps: _incomingSwaps,
+                        onOpen: () async {
+                          await context.push('/duty');
+                          _loadIncomingSwaps();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
-                  // ── Мой график (мини) ──────────────────────────────────
-                  _ScheduleMini(
-                    schedules: _schedules,
-                    loading: _loadingSchedule,
-                    onTap: () => context.push('/home/schedule'),
+                  // attendance
+                  _AnimatedSection(
+                    fade: _sectionFades[1], slide: _sectionSlides[1],
+                    child: _AttendanceCard(
+                      record: _today,
+                      loading: _loadingAttendance,
+                      actionLoading: _actionLoading,
+                      schedule: _todaySchedule,
+                      liveTime: _liveWorkTime(),
+                      enableCheckInOut: !auth.isAdmin,
+                      onCheckIn: _onCheckIn,
+                      onCheckOut: _onCheckOut,
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
 
-                  // ── Последние новости ──────────────────────────────────
-                  _NewsMini(
-                    news: _news,
-                    loading: _loadingNews,
-                    onAll: () => context.go('/news'),
-                    onItem: (id) => context.push('/news/$id'),
+                  // schedule mini
+                  _AnimatedSection(
+                    fade: _sectionFades[2], slide: _sectionSlides[2],
+                    child: _ScheduleMini(
+                      schedules: _schedules,
+                      loading: _loadingSchedule,
+                      onTap: () => context.push('/home/schedule'),
+                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 14),
+
+                  // duty section
+                  _AnimatedSection(
+                    fade: _sectionFades[3], slide: _sectionSlides[3],
+                    child: _DutySectionHome(
+                      duties: _todayDuties,
+                      loading: _loadingDuty,
+                      currentUserId: user?.id,
+                      onOpen: () => context.go('/duty'),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // news mini
+                  _AnimatedSection(
+                    fade: _sectionFades[4], slide: _sectionSlides[4],
+                    child: _NewsMini(
+                      news: _news,
+                      loading: _loadingNews,
+                      onAll: () => context.go('/news'),
+                      onItem: (id) => context.push('/news/$id'),
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -369,62 +432,393 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Subwidgets
+// HEADER
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _DateBanner extends StatelessWidget {
+class _Header extends StatelessWidget {
+  final String greeting;
+  final String firstName;
+  final String avatarUrl;
+  final bool isAdmin;
+  final VoidCallback onAvatar;
+  final VoidCallback onAdmin;
   final DateTime now;
-  const _DateBanner({required this.now});
+
+  const _Header({
+    required this.greeting,
+    required this.firstName,
+    required this.avatarUrl,
+    required this.isAdmin,
+    required this.onAvatar,
+    required this.onAdmin,
+    required this.now,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF4361EE), Color(0xFF3451D1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.28),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
-      child: Row(
-        children: [
-          Column(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                DateFormat('EEEE', 'ru').format(now).capitalize(),
-                style: const TextStyle(
-                    color: Colors.white70, fontSize: 13, fontFamily: 'Inter'),
+              // top row
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          greeting,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Привет, $firstName! 👋',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Inter',
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isAdmin)
+                    GestureDetector(
+                      onTap: onAdmin,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.admin_panel_settings_outlined,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                  GestureDetector(
+                    onTap: onAvatar,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+                      ),
+                      child: ClipOval(
+                        child: avatarUrl.isNotEmpty
+                            ? Image.network(
+                                avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                DateFormat('d MMMM yyyy', 'ru').format(now),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Inter'),
+              const SizedBox(height: 20),
+              // date chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today_rounded,
+                        color: Colors.white70, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      DateFormat('EEEE, d MMMM', 'ru').format(now).capitalize(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QUICK STATS ROW
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _QuickStatsRow extends StatelessWidget {
+  final AttendanceModel? today;
+  final bool loading;
+  final int dutiesCount;
+  final int newsCount;
+  final VoidCallback onAttendance;
+  final VoidCallback onDuty;
+  final VoidCallback onNews;
+
+  const _QuickStatsRow({
+    required this.today,
+    required this.loading,
+    required this.dutiesCount,
+    required this.newsCount,
+    required this.onAttendance,
+    required this.onDuty,
+    required this.onNews,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final checkIn = today?.formattedCheckIn ?? '--:--';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+          children: [
+            Expanded(
+              child: _StatMiniCard(
+                icon: Icons.login_rounded,
+                label: 'Приход',
+                value: loading ? '...' : checkIn,
+                color: _kCard1,
+                onTap: onAttendance,
+              ),
             ),
-            child: const Icon(Icons.calendar_today_rounded,
-                color: Colors.white, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _StatMiniCard(
+                icon: Icons.cleaning_services_rounded,
+                label: 'Дежурство',
+                value: dutiesCount > 0 ? 'Назначено' : 'Нет',
+                color: _kCard2,
+                onTap: onDuty,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _StatMiniCard(
+                icon: Icons.article_rounded,
+                label: 'Новости',
+                value: '$newsCount',
+                color: _kCard3,
+                onTap: onNews,
+              ),
+            ),
+          ],
+      ),
+    );
+  }
+
+}
+
+class _StatMiniCard extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _StatMiniCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_StatMiniCard> createState() => _StatMiniCardState();
+}
+
+class _StatMiniCardState extends State<_StatMiniCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressCtrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 120));
+    _scale = Tween<double>(begin: 1.0, end: 0.94)
+        .animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _pressCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _pressCtrl.forward(),
+      onTapUp: (_) { _pressCtrl.reverse(); widget.onTap(); },
+      onTapCancel: () => _pressCtrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: widget.color,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withOpacity(0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(widget.icon, color: Colors.white, size: 16),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                widget.value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'Inter',
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.75),
+                  fontSize: 11,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ANIMATED SECTION WRAPPER
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _AnimatedSection extends StatelessWidget {
+  final Animation<double> fade;
+  final Animation<Offset> slide;
+  final Widget child;
+
+  const _AnimatedSection({
+    required this.fade,
+    required this.slide,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(position: slide, child: child),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ERROR BANNER
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorBanner({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.error.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: AppColors.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.error, fontFamily: 'Inter')),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Повтор',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.error)),
           ),
         ],
       ),
@@ -432,7 +826,211 @@ class _DateBanner extends StatelessWidget {
   }
 }
 
-// ─── Attendance Card ───────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// DUTY CALLOUT
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _DutyCalloutCard extends StatelessWidget {
+  final VoidCallback onOpen;
+  const _DutyCalloutCard({required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onOpen,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF8C42), Color(0xFFFFB347)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: _kOrange.withOpacity(0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.restaurant_menu_rounded,
+                  color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Вы сегодня дежурный!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'Inter',
+                      )),
+                  SizedBox(height: 4),
+                  Text('Нажмите для подробностей',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      )),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.white70, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SWAP REQUEST BANNER
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SwapRequestBanner extends StatelessWidget {
+  final List<DutySwap> swaps;
+  final VoidCallback onOpen;
+
+  const _SwapRequestBanner({required this.swaps, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = swaps.length;
+    final names = swaps
+        .map((s) => s.requesterName ?? 'Сотрудник')
+        .toSet()
+        .take(2)
+        .join(', ');
+    final subtitle = count == 1
+        ? '$names хочет поменяться с вами дежурством'
+        : '$names и ещё ${count - 1} чел. хотят поменяться';
+
+    return GestureDetector(
+      onTap: onOpen,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF4361EE).withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF4361EE).withOpacity(0.1),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4361EE).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.swap_horiz_rounded,
+                      color: Color(0xFF4361EE), size: 24),
+                ),
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF6B6B),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    count == 1
+                        ? 'Запрос на обмен дежурством'
+                        : '$count запроса на обмен',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Inter',
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4361EE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Смотреть',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATTENDANCE CARD
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _AttendanceCard extends StatelessWidget {
   final AttendanceModel? record;
@@ -440,10 +1038,9 @@ class _AttendanceCard extends StatelessWidget {
   final bool actionLoading;
   final EmployeeScheduleModel? schedule;
   final String liveTime;
+  final bool enableCheckInOut;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
-  /// Для админа: без QR-отметки прихода/ухода в этом блоке (учёт — в панели).
-  final bool enableCheckInOut;
 
   const _AttendanceCard({
     required this.record,
@@ -451,83 +1048,97 @@ class _AttendanceCard extends StatelessWidget {
     required this.actionLoading,
     required this.schedule,
     required this.liveTime,
+    required this.enableCheckInOut,
     required this.onCheckIn,
     required this.onCheckOut,
-    this.enableCheckInOut = true,
   });
 
-  bool get _excusedToday =>
-      record != null && record!.status.toLowerCase() == 'approved_absence';
-
-  bool get _canCheckIn =>
-      !_excusedToday && (record == null || record!.checkInTime == null);
-  bool get _canCheckOut =>
-      !_excusedToday &&
-      record?.checkInTime != null &&
-      record?.checkOutTime == null;
-  bool get _done => record?.checkOutTime != null;
+  bool get _excused => record?.status.toLowerCase() == 'approved_absence';
+  bool get _canIn   => !_excused && (record == null || record!.checkInTime == null);
+  bool get _canOut  => !_excused && record?.checkInTime != null && record?.checkOutTime == null;
+  bool get _done    => record?.checkOutTime != null;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: loading
-          ? const _Shimmer(height: 100)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Посещаемость сегодня',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter'),
+          ? Padding(
+              padding: const EdgeInsets.all(20),
+              child: _Shimmer(height: 120))
+          : Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // header row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.access_time_rounded,
+                            color: AppColors.primary, size: 18),
                       ),
-                    ),
-                    if (record != null) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: StatusBadge(status: record!.status),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Посещаемость сегодня',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                          ),
                         ),
                       ),
+                      if (record != null) StatusBadge(status: record!.status),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 16),
+                  ),
 
-                // Расписание сегодня
-                if (schedule != null && schedule!.isWorkingDay) ...[
-                  Row(children: [
-                    const Icon(Icons.schedule_rounded,
-                        size: 14, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'График: ${schedule!.formattedStart} – ${schedule!.formattedEnd}',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter'),
+                  // schedule
+                  if (schedule != null && schedule!.isWorkingDay) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _kBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.schedule_rounded,
+                            size: 13, color: AppColors.textHint),
+                        const SizedBox(width: 6),
+                        Text(
+                          'График: ${schedule!.formattedStart} – ${schedule!.formattedEnd}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ]),
                     ),
-                  ]),
-                  const SizedBox(height: 14),
-                ],
+                  ],
 
-                // Временные блоки
-                if (!loading)
+                  const SizedBox(height: 16),
+
+                  // time boxes
                   Row(children: [
                     _TimeBox(
                       label: 'Приход',
@@ -546,196 +1157,124 @@ class _AttendanceCard extends StatelessWidget {
                       const SizedBox(width: 10),
                       _TimeBox(
                         label: _done ? 'Итого' : 'Сейчас',
-                        value: _done
-                            ? (record?.workDuration ?? '')
-                            : liveTime,
+                        value: _done ? (record?.workDuration ?? '') : liveTime,
                         icon: Icons.timer_outlined,
                         color: AppColors.primary,
                       ),
                     ],
                   ]),
 
-                // Опоздание
-                if (record != null && record!.lateMinutes > 0) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.warningLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          color: AppColors.warning, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Опоздание: ${record!.lateMinutes} мин',
-                        style: const TextStyle(
+                  // late warning
+                  if (record != null && record!.lateMinutes > 0) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            color: AppColors.warning, size: 15),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Опоздание: ${record!.lateMinutes} мин',
+                          style: const TextStyle(
                             color: AppColors.warning,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter'),
-                      ),
-                    ]),
-                  ),
-                ],
-
-                const SizedBox(height: 16),
-
-                // Кнопки
-                if (!enableCheckInOut)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.25)),
-                    ),
-                    child: const Text(
-                      'Для учётной записи администратора сканирование QR в этом блоке отключено. '
-                      'Посещаемость команды отражается в панели администратора.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.primary,
-                        fontFamily: 'Inter',
-                        height: 1.4,
-                      ),
-                    ),
-                  )
-                else if (_excusedToday)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.successLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColors.success.withOpacity(0.25)),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.verified_user_rounded,
-                            color: AppColors.success, size: 22),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Сегодня у вас разрешённое отсутствие (отпуск, больничный и т.д.). '
-                            'Отметки прихода и ухода не нужны.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textPrimary,
-                              fontFamily: 'Inter',
-                              height: 1.35,
-                            ),
+                            fontFamily: 'Inter',
                           ),
                         ),
-                      ],
+                      ]),
                     ),
-                  )
-                else if (actionLoading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: CircularProgressIndicator(
-                          color: AppColors.primary, strokeWidth: 2.5),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // action area
+                  if (!enableCheckInOut)
+                    _InfoBox(
+                      color: AppColors.primary,
+                      bg: AppColors.primaryLight,
+                      icon: Icons.info_outline_rounded,
+                      text: 'Для администраторов учёт посещаемости ведётся через панель администратора.',
+                    )
+                  else if (_excused)
+                    _InfoBox(
+                      color: AppColors.success,
+                      bg: AppColors.successLight,
+                      icon: Icons.verified_user_rounded,
+                      text: 'Сегодня у вас утверждённое отсутствие. Отметки не нужны.',
+                    )
+                  else if (actionLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: CircularProgressIndicator(
+                            color: AppColors.primary, strokeWidth: 2.5),
+                      ),
+                    )
+                  else
+                    _ActionButtons(
+                      canCheckIn: _canIn,
+                      canCheckOut: _canOut,
+                      onCheckIn: onCheckIn,
+                      onCheckOut: onCheckOut,
                     ),
-                  )
-                else
-                  _ActionButtons(
-                    canCheckIn: _canCheckIn,
-                    canCheckOut: _canCheckOut,
-                    onCheckIn: onCheckIn,
-                    onCheckOut: onCheckOut,
-                  ),
-              ],
+                ],
+              ),
             ),
     );
   }
 }
 
-class _LunchDutyCallout extends StatelessWidget {
-  final VoidCallback onOpen;
-  const _LunchDutyCallout({required this.onOpen});
+class _InfoBox extends StatelessWidget {
+  final Color color, bg;
+  final IconData icon;
+  final String text;
+
+  const _InfoBox({
+    required this.color, required this.bg,
+    required this.icon, required this.text,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onOpen,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF8E7),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.warning.withOpacity(0.45)),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.restaurant_menu_rounded,
-                      color: AppColors.warning, size: 22),
-                  SizedBox(width: 8),
-                  Text(
-                    'Вы дежурный по обеду сегодня',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Вы должны приготовить обед: от принесения еды до мытья посуды и наведения порядка. '
-                'Если вы не можете выполнить дежурство, перенесите его другому сотруднику. '
-                'Если он примет вашу заявку, тогда он выполнит дежурство. '
-                'После выполнения отсканируйте QR в офисе — администратор подтвердит.',
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
                 style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.45,
-                ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Открыть раздел дежурства →',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ],
+                    fontSize: 13, color: color, fontFamily: 'Inter',
+                    fontWeight: FontWeight.w500, height: 1.4)),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
 class _TimeBox extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label, value;
   final IconData icon;
   final Color color;
 
   const _TimeBox({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
+    required this.label, required this.value,
+    required this.icon, required this.color,
   });
 
   @override
@@ -744,23 +1283,25 @@ class _TimeBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(12),
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 16),
+            Icon(icon, color: color, size: 15),
             const SizedBox(height: 6),
             Text(value,
                 style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                     color: color,
-                    fontFamily: 'Inter')),
+                    fontFamily: 'Inter',
+                    letterSpacing: -0.3)),
+            const SizedBox(height: 1),
             Text(label,
                 style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: AppColors.textHint,
                     fontFamily: 'Inter')),
           ],
@@ -771,10 +1312,8 @@ class _TimeBox extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
-  final bool canCheckIn;
-  final bool canCheckOut;
-  final VoidCallback onCheckIn;
-  final VoidCallback onCheckOut;
+  final bool canCheckIn, canCheckOut;
+  final VoidCallback onCheckIn, onCheckOut;
 
   const _ActionButtons({
     required this.canCheckIn,
@@ -786,30 +1325,26 @@ class _ActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Expanded(
-        child: _PressButton(
-          label: 'Приход',
-          icon: Icons.login_rounded,
-          color: AppColors.success,
-          enabled: canCheckIn,
-          onTap: onCheckIn,
-        ),
-      ),
+      Expanded(child: _PressButton(
+        label: 'Приход',
+        icon: Icons.login_rounded,
+        color: AppColors.success,
+        enabled: canCheckIn,
+        onTap: onCheckIn,
+      )),
       const SizedBox(width: 10),
-      Expanded(
-        child: _PressButton(
-          label: 'Уход',
-          icon: Icons.logout_rounded,
-          color: AppColors.error,
-          enabled: canCheckOut,
-          onTap: onCheckOut,
-        ),
-      ),
+      Expanded(child: _PressButton(
+        label: 'Уход',
+        icon: Icons.logout_rounded,
+        color: AppColors.error,
+        enabled: canCheckOut,
+        onTap: onCheckOut,
+      )),
     ]);
   }
 }
 
-class _PressButton extends StatelessWidget {
+class _PressButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final Color color;
@@ -817,45 +1352,76 @@ class _PressButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PressButton({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.enabled,
+    required this.label, required this.icon,
+    required this.color, required this.enabled,
     required this.onTap,
   });
 
   @override
+  State<_PressButton> createState() => _PressButtonState();
+}
+
+class _PressButtonState extends State<_PressButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl  = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
+    _scale = Tween<double>(begin: 1.0, end: 0.95)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) {
+    final active = widget.enabled;
     return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 48,
-        decoration: BoxDecoration(
-          color: enabled ? color : color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                color: enabled ? Colors.white : color.withOpacity(0.4),
-                size: 18),
-            const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                    color: enabled ? Colors.white : color.withOpacity(0.4),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    fontFamily: 'Inter')),
-          ],
+      onTapDown:  (_) { if (active) _ctrl.forward(); },
+      onTapUp:    (_) { _ctrl.reverse(); if (active) widget.onTap(); },
+      onTapCancel: () => _ctrl.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 50,
+          decoration: BoxDecoration(
+            color: active ? widget.color : widget.color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: active
+                ? [BoxShadow(
+                    color: widget.color.withOpacity(0.35),
+                    blurRadius: 12, offset: const Offset(0, 4))]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(widget.icon,
+                  color: active ? Colors.white : widget.color.withOpacity(0.35),
+                  size: 18),
+              const SizedBox(width: 8),
+              Text(widget.label,
+                  style: TextStyle(
+                      color: active ? Colors.white : widget.color.withOpacity(0.35),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      fontFamily: 'Inter')),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ─── Duty Section (Home) ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// DUTY SECTION HOME
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _DutySectionHome extends StatelessWidget {
   final List<DutyAssignment> duties;
@@ -864,85 +1430,46 @@ class _DutySectionHome extends StatelessWidget {
   final VoidCallback onOpen;
 
   const _DutySectionHome({
-    required this.duties,
-    required this.loading,
-    required this.currentUserId,
-    required this.onOpen,
+    required this.duties, required this.loading,
+    required this.currentUserId, required this.onOpen,
   });
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: const _Shimmer(height: 50),
-      );
+      return _CardShell(child: const _Shimmer(height: 60));
     }
 
     if (duties.isEmpty) {
-      return GestureDetector(
+      return _CardShell(
         onTap: onOpen,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+        child: Row(children: [
+          _IconBox(color: AppColors.primary, icon: Icons.cleaning_services_rounded),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Дежурство сегодня',
+                  style: TextStyle(fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter')),
+              SizedBox(height: 3),
+              Text('Дежурного нет',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+            ]),
           ),
-          child: Row(children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.cleaning_services_rounded,
-                  color: AppColors.primary, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Дежурство сегодня',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter')),
-                  SizedBox(height: 4),
-                  Text('Дежурного нет',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Inter')),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
-          ]),
-        ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+        ]),
       );
     }
 
     return Column(
-      children: duties
-          .map((duty) => Padding(
-                padding: EdgeInsets.only(
-                    bottom: duty == duties.last ? 0 : 10),
-                child: _DutyCard(
-                  duty: duty,
-                  isMyDuty: duty.userId == currentUserId,
-                  onOpen: onOpen,
-                ),
-              ))
-          .toList(),
+      children: duties.asMap().entries.map((e) {
+        final duty = e.value;
+        final isMe = duty.userId == currentUserId;
+        return Padding(
+          padding: EdgeInsets.only(bottom: e.key < duties.length - 1 ? 10 : 0),
+          child: _DutyCard(duty: duty, isMyDuty: isMe, onOpen: onOpen),
+        );
+      }).toList(),
     );
   }
 }
@@ -952,83 +1479,61 @@ class _DutyCard extends StatelessWidget {
   final bool isMyDuty;
   final VoidCallback onOpen;
 
-  const _DutyCard({
-    required this.duty,
-    required this.isMyDuty,
-    required this.onOpen,
-  });
+  const _DutyCard({required this.duty, required this.isMyDuty, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
     final isLunch = duty.isLunch;
-    final iconData = isLunch ? Icons.lunch_dining_rounded : Icons.cleaning_services_rounded;
-    final accentColor = isMyDuty ? AppColors.warning : (isLunch ? AppColors.primary : const Color(0xFF34C759));
-    final bgColor = isMyDuty
-        ? const Color(0xFFFFFBEB)
-        : isLunch
-            ? AppColors.primaryLight
-            : const Color(0xFFEAF7EC);
+    final accent = isMyDuty ? _kOrange : (isLunch ? AppColors.primary : _kTeal);
 
     return GestureDetector(
       onTap: onOpen,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isMyDuty ? const Color(0xFFFFFBEB) : AppColors.surface,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isMyDuty ? AppColors.warning : AppColors.border,
+            color: isMyDuty ? _kOrange.withOpacity(0.4) : AppColors.border,
             width: isMyDuty ? 1.5 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12, offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(iconData, color: accentColor, size: 22),
-          ),
+          _IconBox(color: accent, icon: isLunch
+              ? Icons.lunch_dining_rounded
+              : Icons.cleaning_services_rounded),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('${duty.typeEmoji} ${duty.typeLabel} сегодня',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Inter')),
-                const SizedBox(height: 4),
-                Text(
-                  isMyDuty
-                      ? 'Сегодня дежуришь ты!'
-                      : duty.userFullName ?? 'Сотрудник',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isMyDuty ? AppColors.warning : AppColors.textPrimary,
-                      fontFamily: 'Inter'),
-                ),
-                if (isMyDuty)
-                  const Text('Нажмите, чтобы открыть',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textHint,
-                          fontFamily: 'Inter')),
-              ],
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${duty.typeEmoji} ${duty.typeLabel} сегодня',
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter')),
+              const SizedBox(height: 4),
+              Text(
+                isMyDuty ? 'Сегодня дежуришь ты!' : (duty.userFullName ?? 'Сотрудник'),
+                style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700,
+                    color: isMyDuty ? _kOrange : AppColors.textPrimary,
+                    fontFamily: 'Inter'),
+              ),
+            ]),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
         ]),
       ),
     );
   }
 }
 
-// ─── Schedule Mini ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// SCHEDULE MINI
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _ScheduleMini extends StatelessWidget {
   final List<EmployeeScheduleModel> schedules;
@@ -1036,13 +1541,16 @@ class _ScheduleMini extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ScheduleMini({
-    required this.schedules,
-    required this.loading,
-    required this.onTap,
+    required this.schedules, required this.loading, required this.onTap,
   });
 
   static const _days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   int get _todayDow => DateTime.now().weekday - 1;
+
+  EmployeeScheduleModel? _scheduleFor(int dow) {
+    try { return schedules.firstWhere((s) => s.dayOfWeek == dow); }
+    catch (_) { return null; }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1052,69 +1560,72 @@ class _ScheduleMini extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16, offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
-              children: [
-                Text('Мой график',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter')),
-                Spacer(),
-                Text('Подробнее',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontFamily: 'Inter')),
-                Icon(Icons.chevron_right_rounded,
-                    color: AppColors.primary, size: 16),
-              ],
-            ),
-            const SizedBox(height: 14),
+            Row(children: [
+              _IconBox(color: const Color(0xFF7B61FF), icon: Icons.calendar_month_rounded),
+              const SizedBox(width: 12),
+              const Text('Мой график',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+              const Spacer(),
+              const Text('Подробнее',
+                  style: TextStyle(fontSize: 12, color: AppColors.primary, fontFamily: 'Inter')),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+            ]),
+            const SizedBox(height: 16),
             if (loading)
-              const _Shimmer(height: 48)
+              const _Shimmer(height: 56)
             else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(7, (dow) {
-                  final isToday = dow == _todayDow;
-                  final s = _scheduleFor(dow);
+                  final isToday  = dow == _todayDow;
+                  final s        = _scheduleFor(dow);
                   final isWorking = s?.isWorkingDay ?? false;
 
                   return Column(children: [
-                    Container(
-                      width: 38,
-                      height: 38,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
                         color: isToday
-                            ? AppColors.primary
+                            ? _kCard1
                             : isWorking
                                 ? AppColors.primaryLight
-                                : AppColors.divider,
+                                : const Color(0xFFF3F4F6),
                         shape: BoxShape.circle,
+                        boxShadow: isToday
+                            ? [BoxShadow(
+                                color: _kCard1.withOpacity(0.4),
+                                blurRadius: 10, offset: const Offset(0, 3))]
+                            : [],
                       ),
                       child: Center(
-                        child: Text(
-                          _days[dow],
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'Inter',
-                              color: isToday
-                                  ? Colors.white
-                                  : isWorking
-                                      ? AppColors.primary
-                                      : AppColors.textHint),
-                        ),
+                        child: Text(_days[dow],
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Inter',
+                                color: isToday
+                                    ? Colors.white
+                                    : isWorking
+                                        ? AppColors.primary
+                                        : AppColors.textHint)),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       isWorking
                           ? (s?.formattedStart?.substring(0, 5) ?? '')
@@ -1122,9 +1633,7 @@ class _ScheduleMini extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 9,
                           fontFamily: 'Inter',
-                          color: isWorking
-                              ? AppColors.textSecondary
-                              : AppColors.textHint),
+                          color: isWorking ? AppColors.textSecondary : AppColors.textHint),
                     ),
                   ]);
                 }),
@@ -1134,78 +1643,85 @@ class _ScheduleMini extends StatelessWidget {
       ),
     );
   }
-
-  EmployeeScheduleModel? _scheduleFor(int dow) {
-    try {
-      return schedules.firstWhere((s) => s.dayOfWeek == dow);
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
-// ─── News Mini ─────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// NEWS MINI
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _NewsMini extends StatelessWidget {
   final List<News> news;
   final bool loading;
   final VoidCallback onAll;
-  final void Function(String id) onItem;
+  final void Function(String) onItem;
 
   const _NewsMini({
-    required this.news,
-    required this.loading,
-    required this.onAll,
-    required this.onItem,
+    required this.news, required this.loading,
+    required this.onAll, required this.onItem,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16, offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const Text('Новости',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    fontFamily: 'Inter')),
-            const Spacer(),
-            GestureDetector(
-              onTap: onAll,
-              child: const Row(children: [
-                Text('Все',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontFamily: 'Inter')),
-                Icon(Icons.chevron_right_rounded,
-                    color: AppColors.primary, size: 16),
-              ]),
-            ),
-          ]),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Row(children: [
+              _IconBox(color: _kCard3, icon: Icons.newspaper_rounded),
+              const SizedBox(width: 12),
+              const Text('Новости',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+              const Spacer(),
+              GestureDetector(
+                onTap: onAll,
+                child: const Row(children: [
+                  Text('Все',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.primary, fontFamily: 'Inter')),
+                  Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+                ]),
+              ),
+            ]),
+          ),
           const SizedBox(height: 14),
           if (loading)
-            const _Shimmer(height: 80)
+            Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: _Shimmer(height: 80))
           else if (news.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Center(
                 child: Text('Нет новостей',
-                    style: TextStyle(
-                        color: AppColors.textHint, fontFamily: 'Inter')),
+                    style: TextStyle(color: AppColors.textHint, fontFamily: 'Inter')),
               ),
             )
           else
-            ...news.map((n) => _NewsItem(news: n, onTap: () => onItem(n.id))),
+            ...news.asMap().entries.map((e) {
+              final isLast = e.key == news.length - 1;
+              return Column(
+                children: [
+                  _NewsItem(news: e.value, onTap: () => onItem(e.value.id)),
+                  if (!isLast)
+                    const Divider(height: 1, color: AppColors.divider,
+                        indent: 20, endIndent: 20),
+                ],
+              );
+            }),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -1219,47 +1735,57 @@ class _NewsItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
           children: [
-            Row(children: [
-              Expanded(
-                child: Text(news.title,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4361EE), Color(0xFF7B61FF)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 8),
-              Text(
-                DateFormat('d MMM', 'ru').format(news.createdAt),
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textHint,
-                    fontFamily: 'Inter'),
+              child: const Icon(Icons.article_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(news.title,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          fontFamily: 'Inter'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
+                  Text(news.content,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Inter',
+                          height: 1.4),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
               ),
-            ]),
-            const SizedBox(height: 4),
-            Text(news.content,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    fontFamily: 'Inter',
-                    height: 1.4),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              DateFormat('d MMM', 'ru').format(news.createdAt),
+              style: const TextStyle(
+                  fontSize: 10, color: AppColors.textHint, fontFamily: 'Inter'),
+            ),
           ],
         ),
       ),
@@ -1267,7 +1793,57 @@ class _NewsItem extends StatelessWidget {
   }
 }
 
-// ─── Shimmer placeholder ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _CardShell extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _CardShell({required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14, offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _IconBox extends StatelessWidget {
+  final Color color;
+  final IconData icon;
+
+  const _IconBox({required this.color, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Icon(icon, color: color, size: 18),
+    );
+  }
+}
 
 class _Shimmer extends StatelessWidget {
   final double height;
@@ -1277,20 +1853,19 @@ class _Shimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
       baseColor: const Color(0xFFEEEEEE),
-      highlightColor: const Color(0xFFFAFAFA),
+      highlightColor: const Color(0xFFF8F8F8),
       child: Container(
         height: height,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
     );
   }
 }
 
-// ─── Extension ────────────────────────────────────────────────────────────────
-
 extension _Cap on String {
-  String capitalize() => isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+  String capitalize() =>
+      isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
 }

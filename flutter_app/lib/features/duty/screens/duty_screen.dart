@@ -160,23 +160,23 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
   }
 
   Future<void> _showSwapDialog(DutyAssignment assignment) async {
-    List<EmployeeModel> employees = [];
+    List<Map<String, dynamic>> employees = [];
     String? selectedId;
+    String? selectedName;
     bool loadingEmployees = true;
     List<DutyAssignment> peerSlots = [];
     bool loadingPeer = false;
-    String? selectedPeerAssignmentId; // null = коллега просто берёт ваше дежурство
+    String? selectedPeerAssignmentId;
 
-    final result = await showDialog<Map<String, String?>>(
+    final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) {
+          // load colleagues once
           if (loadingEmployees) {
-            ref.read(apiServiceProvider).getEmployees().then((list) {
-              final me = ref.read(authProvider).user?.id;
-              final filtered = list.where((e) => e.id != me).toList();
+            ref.read(apiServiceProvider).getDutyColleagues().then((list) {
               setLocal(() {
-                employees = filtered;
+                employees = list;
                 loadingEmployees = false;
               });
             }).catchError((_) {
@@ -191,10 +191,13 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
               selectedPeerAssignmentId = null;
             });
             try {
-              final list =
-                  await ref.read(apiServiceProvider).getPeerDutyAssignments(userId);
-              final sameType =
-                  list.where((a) => a.dutyType == assignment.dutyType && !a.isCompleted).toList();
+              final list = await ref.read(apiServiceProvider)
+                  .getPeerDutyAssignments(userId);
+              // only future uncompleted duties of the SAME type
+              final sameType = list
+                  .where((a) =>
+                      a.dutyType == assignment.dutyType && !a.isCompleted)
+                  .toList();
               setLocal(() {
                 peerSlots = sameType;
                 loadingPeer = false;
@@ -204,44 +207,78 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
             }
           }
 
+          final canSend =
+              selectedId != null && selectedPeerAssignmentId != null;
+
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Запрос обмена',
-                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700, fontSize: 18)),
+                const Text('Запрос на обмен',
+                    style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18)),
                 const SizedBox(height: 4),
                 _DutyTypeBadge(dutyType: assignment.dutyType),
               ],
             ),
             content: SizedBox(
-              width: 320,
+              width: 340,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Ваше дежурство: ${_formatDate(assignment.date)}. '
-                      'Второй сотрудник подтверждает обмен без админа. '
-                      'После обмена отметка выполнения — через QR и подтверждение админа.',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Inter',
-                        height: 1.4,
+                    // ── Your duty info ────────────────────────────────────
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person_outline_rounded,
+                              color: AppColors.primary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Ваше дежурство: ${_formatDate(assignment.date)}',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'Inter',
+                                  color: AppColors.primary),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // ── Step 1: pick colleague ────────────────────────────
+                    const Text('1. Выберите коллегу',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter')),
+                    const SizedBox(height: 8),
                     if (loadingEmployees)
-                      const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      const Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.primary))
                     else if (employees.isEmpty)
                       const Text('Нет доступных сотрудников',
-                          style: TextStyle(color: AppColors.textHint, fontFamily: 'Inter'))
+                          style: TextStyle(
+                              color: AppColors.textHint, fontFamily: 'Inter'))
                     else
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColors.border),
                           borderRadius: BorderRadius.circular(12),
@@ -251,40 +288,57 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
                             value: selectedId,
                             isExpanded: true,
                             hint: const Text('Выберите сотрудника',
-                                style: TextStyle(fontFamily: 'Inter', fontSize: 14)),
-                            items: employees
-                                .map((e) => DropdownMenuItem(
-                                      value: e.id,
-                                      child: Row(children: [
-                                        CircleAvatar(
-                                          radius: 14,
-                                          backgroundColor: AppColors.primaryLight,
-                                          child: Text(e.fullName[0],
-                                              style: const TextStyle(
-                                                  color: AppColors.primary,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700)),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                            child: Text(e.fullName,
-                                                style: const TextStyle(
-                                                    fontFamily: 'Inter', fontSize: 14))),
-                                      ]),
-                                    ))
-                                .toList(),
+                                style: TextStyle(
+                                    fontFamily: 'Inter', fontSize: 14)),
+                            items: employees.map((e) {
+                              final id = e['id'] as String;
+                              final name =
+                                  (e['full_name'] as String? ?? '?');
+                              return DropdownMenuItem(
+                                value: id,
+                                child: Row(children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: AppColors.primaryLight,
+                                    child: Text(
+                                        name.isNotEmpty ? name[0] : '?',
+                                        style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                      child: Text(name,
+                                          style: const TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 14))),
+                                ]),
+                              );
+                            }).toList(),
                             onChanged: (val) {
-                              setLocal(() => selectedId = val);
-                              if (val != null) loadPeer(val);
+                              if (val == null) return;
+                              final name = employees
+                                  .firstWhere((e) => e['id'] == val,
+                                      orElse: () => {})['full_name']
+                                  as String? ??
+                                  '';
+                              setLocal(() {
+                                selectedId = val;
+                                selectedName = name;
+                              });
+                              loadPeer(val);
                             },
                           ),
                         ),
                       ),
+
+                    // ── Step 2: pick peer duty ────────────────────────────
                     if (selectedId != null) ...[
                       const SizedBox(height: 16),
-                      const Text(
-                        'Тип обмена',
-                        style: TextStyle(
+                      Text(
+                        '2. Дата дежурства ${selectedName ?? "коллеги"} для обмена',
+                        style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
@@ -299,42 +353,94 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
                               color: AppColors.primary, strokeWidth: 2),
                         ))
                       else if (peerSlots.isEmpty)
-                        const Text(
-                          'У коллеги нет будущих дежурств этого типа — он просто возьмёт ваше назначение.',
-                          style: TextStyle(fontSize: 12, color: AppColors.textHint, fontFamily: 'Inter'),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3F3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.error.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded,
+                                  color: AppColors.error, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'У ${selectedName ?? "этого сотрудника"} нет будущих дежурств '
+                                  '${assignment.dutyType == "LUNCH" ? "обеда" : "уборки"} для обмена.',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.error,
+                                      fontFamily: 'Inter',
+                                      height: 1.35),
+                                ),
+                              ),
+                            ],
+                          ),
                         )
                       else
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.border),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String?>(
+                            child: DropdownButton<String>(
                               value: selectedPeerAssignmentId,
                               isExpanded: true,
-                              hint: const Text('Только моё → коллеге',
-                                  style: TextStyle(fontFamily: 'Inter', fontSize: 13)),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('Передать только моё дежурство',
-                                      style: TextStyle(fontFamily: 'Inter', fontSize: 13)),
-                                ),
-                                ...peerSlots.map((a) => DropdownMenuItem<String?>(
-                                      value: a.id,
-                                      child: Text(
-                                        'Взаимно: их дата ${_formatDate(a.date)}',
-                                        style: const TextStyle(
-                                            fontFamily: 'Inter', fontSize: 13),
-                                      ),
-                                    )),
-                              ],
-                              onChanged: (v) => setLocal(() => selectedPeerAssignmentId = v),
+                              hint: const Text('Выберите дату',
+                                  style: TextStyle(
+                                      fontFamily: 'Inter', fontSize: 13)),
+                              items: peerSlots
+                                  .map((a) => DropdownMenuItem<String>(
+                                        value: a.id,
+                                        child: Text(
+                                          _formatDate(a.date),
+                                          style: const TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 13),
+                                        ),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) => setLocal(
+                                  () => selectedPeerAssignmentId = v),
                             ),
                           ),
                         ),
+                    ],
+
+                    // ── Summary ───────────────────────────────────────────
+                    if (canSend) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz_rounded,
+                                color: AppColors.success, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Обмен: ваша дата ↔ дата ${selectedName ?? "коллеги"}.\n'
+                                'Коллега должен принять запрос.',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.success,
+                                    fontFamily: 'Inter',
+                                    height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -343,21 +449,25 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Отмена', style: TextStyle(color: AppColors.textHint)),
+                child: const Text('Отмена',
+                    style: TextStyle(color: AppColors.textHint)),
               ),
               ElevatedButton(
-                onPressed: selectedId == null
-                    ? null
-                    : () => Navigator.of(ctx).pop({
-                          'userId': selectedId,
-                          'peerAssignmentId': selectedPeerAssignmentId,
-                        }),
+                onPressed: canSend
+                    ? () => Navigator.of(ctx).pop({
+                          'userId': selectedId!,
+                          'peerAssignmentId': selectedPeerAssignmentId!,
+                        })
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  disabledBackgroundColor: AppColors.border,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   minimumSize: const Size(0, 40),
                 ),
-                child: const Text('Отправить', style: TextStyle(color: Colors.white)),
+                child: const Text('Отправить',
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           );
@@ -366,20 +476,19 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
     );
 
     if (result == null || !mounted) return;
-    final targetId = result['userId'];
-    if (targetId == null || targetId.isEmpty) return;
     try {
       await ref.read(apiServiceProvider).requestSwap(
-        assignmentId: assignment.id,
-        targetUserId: targetId,
-        targetAssignmentId: result['peerAssignmentId'],
-      );
+            assignmentId: assignment.id,
+            targetUserId: result['userId']!,
+            targetAssignmentId: result['peerAssignmentId'],
+          );
       if (!mounted) return;
       _showSnack('Запрос на обмен отправлен!', AppColors.success);
     } catch (e) {
       if (!mounted) return;
-      final msg = RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(e.toString())?.group(1) ??
-          'Ошибка при отправке запроса';
+      final msg =
+          RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(e.toString())?.group(1) ??
+              'Ошибка при отправке запроса';
       _showSnack(msg, AppColors.error);
     }
   }

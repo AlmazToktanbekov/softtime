@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -513,6 +514,43 @@ def delete_user(
     )
     db.commit()
     return {"message": f"Пользователь {target.username} помечен как удалённый"}
+
+
+# ── PATCH /users/{user_id}/reset-password ────────────────────────────────────
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+@router.patch("/{user_id}/reset-password")
+def reset_user_password(
+    user_id: uuid.UUID,
+    data: ResetPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Админ сбрасывает пароль сотруднику."""
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Пароль должен быть минимум 6 символов")
+
+    target = _get_user_or_404(db, user_id)
+
+    if target.role == UserRole.SUPER_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Нельзя сбросить пароль Super Admin")
+
+    target.password_hash = get_password_hash(data.new_password)
+
+    write_audit(
+        db,
+        actor_id=current_user.id,
+        action="RESET_PASSWORD",
+        entity="User",
+        entity_id=target.id,
+        new_value={"reset_by": str(current_user.id)},
+        request=request,
+    )
+    db.commit()
+    return {"message": f"Пароль пользователя {target.full_name} успешно сброшен"}
 
 
 # ── PATCH /users/me/avatar ────────────────────────────────────────────────────

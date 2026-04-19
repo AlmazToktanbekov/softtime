@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/models/attendance_model.dart';
-import '../../../core/models/user_model.dart';
 import '../../../providers.dart';
 
 class AdminReportsScreen extends ConsumerStatefulWidget {
@@ -15,106 +13,20 @@ class AdminReportsScreen extends ConsumerStatefulWidget {
   ConsumerState<AdminReportsScreen> createState() => _AdminReportsScreenState();
 }
 
-class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
-  bool _isWeekly = true;
-  bool _loading = true;
-  List<AttendanceModel> _records = [];
-  List<EmployeeModel> _employees = [];
+class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _tabController = TabController(length: 3, vsync: this);
   }
 
-  Future<void> _load() async {
-    if (mounted) setState(() => _loading = true);
-    try {
-      final api = ref.read(apiServiceProvider);
-      final now = DateTime.now();
-      final endDate = DateFormat('yyyy-MM-dd').format(now);
-      final startDate = _isWeekly
-          ? DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 6)))
-          : DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
-
-      final results = await Future.wait([
-        api.getAllAttendance(startDate: startDate, endDate: endDate),
-        api.getEmployees(),
-      ]);
-
-      if (!mounted) return;
-      setState(() {
-        _records = results[0] as List<AttendanceModel>;
-        _employees = (results[1] as List<EmployeeModel>)
-            .where((e) => !['ADMIN', 'SUPER_ADMIN'].contains(e.role))
-            .toList();
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  // Count status occurrences
-  Map<String, int> get _statusCounts {
-    final counts = <String, int>{};
-    for (final r in _records) {
-      counts[r.status] = (counts[r.status] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  // Per-employee hours
-  List<_EmployeeStat> get _employeeStats {
-    final Map<String, _EmployeeStat> stats = {};
-    for (final r in _records) {
-      if (!stats.containsKey(r.userId)) {
-        final name = _findName(r.userId);
-        stats[r.userId] = _EmployeeStat(id: r.userId, name: name);
-      }
-      final s = stats[r.userId]!;
-      if (r.checkInTime != null && r.checkOutTime != null) {
-        try {
-          final inDt = DateTime.parse(r.checkInTime!);
-          final outDt = DateTime.parse(r.checkOutTime!);
-          s.totalMinutes += outDt.difference(inDt).inMinutes;
-        } catch (_) {}
-      }
-      if (r.status == 'LATE') s.lateCount++;
-      if (r.status == 'ABSENT' || r.status == 'INCOMPLETE') s.absentCount++;
-    }
-    return stats.values.toList()
-      ..sort((a, b) => b.totalMinutes.compareTo(a.totalMinutes));
-  }
-
-  String _findName(String userId) {
-    try {
-      return _employees.firstWhere((e) => e.id == userId).fullName;
-    } catch (_) {
-      return userId.substring(0, 8);
-    }
-  }
-
-  // Build daily spots for line chart
-  List<FlSpot> _buildChartSpots() {
-    final now = DateTime.now();
-    final days = _isWeekly ? 7 : now.day;
-    final Map<String, int> countByDay = {};
-    for (int i = days - 1; i >= 0; i--) {
-      final d = DateFormat('yyyy-MM-dd').format(now.subtract(Duration(days: i)));
-      countByDay[d] = 0;
-    }
-    for (final r in _records) {
-      final date = r.date.substring(0, 10);
-      if (countByDay.containsKey(date)) {
-        if (['PRESENT', 'LATE', 'OVERTIME'].contains(r.status)) {
-          countByDay[date] = (countByDay[date] ?? 0) + 1;
-        }
-      }
-    }
-    final entries = countByDay.entries.toList();
-    return List.generate(
-        entries.length, (i) => FlSpot(i.toDouble(), entries[i].value.toDouble()));
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -124,512 +36,713 @@ class _AdminReportsScreenState extends ConsumerState<AdminReportsScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Отчёты'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-          ),
-        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textHint,
+          indicatorColor: AppColors.primary,
+          labelStyle: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'Inter'),
+          tabs: const [
+            Tab(text: 'День'),
+            Tab(text: 'Неделя'),
+            Tab(text: 'Месяц'),
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          // Period toggle
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Container(
-              height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  _PeriodTab(
-                    label: 'Неделя',
-                    isActive: _isWeekly,
-                    onTap: () {
-                      if (!_isWeekly) {
-                        setState(() => _isWeekly = true);
-                        _load();
-                      }
-                    },
-                  ),
-                  _PeriodTab(
-                    label: 'Месяц',
-                    isActive: !_isWeekly,
-                    onTap: () {
-                      if (_isWeekly) {
-                        setState(() => _isWeekly = false);
-                        _load();
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary))
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    color: AppColors.primary,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _buildSummaryCards(),
-                        const SizedBox(height: 16),
-                        _buildLineChartCard(),
-                        const SizedBox(height: 16),
-                        _buildStatusDistribution(),
-                        const SizedBox(height: 16),
-                        _buildTopEmployees(),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCards() {
-    final counts = _statusCounts;
-    final present = (counts['PRESENT'] ?? 0) + (counts['LATE'] ?? 0) + (counts['OVERTIME'] ?? 0);
-    final late = counts['LATE'] ?? 0;
-    final absent = (counts['ABSENT'] ?? 0) + (counts['INCOMPLETE'] ?? 0);
-    final approved = counts['APPROVED_ABSENCE'] ?? 0;
-
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.5,
-      children: [
-        _GridStatCard(
-            value: '$present',
-            label: 'Явки',
-            icon: Icons.check_circle_rounded,
-            color: AppColors.success,
-            bg: AppColors.successLight),
-        _GridStatCard(
-            value: '$late',
-            label: 'Опоздания',
-            icon: Icons.timer_outlined,
-            color: AppColors.warning,
-            bg: AppColors.warningLight),
-        _GridStatCard(
-            value: '$absent',
-            label: 'Пропуски',
-            icon: Icons.cancel_rounded,
-            color: AppColors.error,
-            bg: AppColors.errorLight),
-        _GridStatCard(
-            value: '$approved',
-            label: 'Уважительные',
-            icon: Icons.verified_user_rounded,
-            color: AppColors.purple,
-            bg: AppColors.purpleLight),
-      ],
-    );
-  }
-
-  Widget _buildLineChartCard() {
-    final spots = _buildChartSpots();
-    final now = DateTime.now();
-    final days = _isWeekly ? 7 : now.day;
-    final labels = List.generate(days, (i) {
-      final d = now.subtract(Duration(days: days - 1 - i));
-      return _isWeekly
-          ? DateFormat('E', 'ru').format(d)
-          : DateFormat('d', 'ru').format(d);
-    });
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _isWeekly ? 'Посещаемость за неделю' : 'Посещаемость за месяц',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 140,
-            child: spots.isEmpty
-                ? const Center(
-                    child: Text('Нет данных',
-                        style: TextStyle(
-                            color: AppColors.textHint, fontFamily: 'Inter')))
-                : LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (v) =>
-                            const FlLine(color: AppColors.divider, strokeWidth: 1),
-                      ),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 24,
-                            interval: 3,
-                            getTitlesWidget: (v, _) => Text(
-                              '${v.toInt()}',
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: AppColors.textHint,
-                                  fontFamily: 'Inter'),
-                            ),
-                          ),
-                        ),
-                        rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false)),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 20,
-                            interval: _isWeekly ? 1 : 5,
-                            getTitlesWidget: (v, _) {
-                              final i = v.toInt();
-                              if (i < 0 || i >= labels.length) {
-                                return const SizedBox.shrink();
-                              }
-                              return Text(
-                                labels[i],
-                                style: const TextStyle(
-                                    fontSize: 9,
-                                    color: AppColors.textHint,
-                                    fontFamily: 'Inter'),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: spots,
-                          isCurved: true,
-                          color: AppColors.primary,
-                          barWidth: 2.5,
-                          isStrokeCapRound: true,
-                          dotData: FlDotData(
-                            show: true,
-                            getDotPainter: (s, _, __, ___) => FlDotCirclePainter(
-                              radius: 3,
-                              color: AppColors.primary,
-                              strokeWidth: 1.5,
-                              strokeColor: Colors.white,
-                            ),
-                          ),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              colors: [
-                                AppColors.primary.withOpacity(0.15),
-                                AppColors.primary.withOpacity(0.0),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusDistribution() {
-    final counts = _statusCounts;
-    if (counts.isEmpty) return const SizedBox.shrink();
-
-    final total = counts.values.fold(0, (a, b) => a + b);
-    if (total == 0) return const SizedBox.shrink();
-
-    final present =
-        ((counts['PRESENT'] ?? 0) + (counts['LATE'] ?? 0) + (counts['OVERTIME'] ?? 0)) /
-            total *
-            100;
-    final absent =
-        ((counts['ABSENT'] ?? 0) + (counts['INCOMPLETE'] ?? 0)) / total * 100;
-    final approved = (counts['APPROVED_ABSENCE'] ?? 0) / total * 100;
-    final other = 100 - present - absent - approved;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Распределение статусов',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              SizedBox(
-                width: 120,
-                height: 120,
-                child: PieChart(
-                  PieChartData(
-                    sections: [
-                      PieChartSectionData(
-                        value: present,
-                        color: AppColors.success,
-                        radius: 46,
-                        title: '',
-                      ),
-                      PieChartSectionData(
-                        value: absent,
-                        color: AppColors.error,
-                        radius: 46,
-                        title: '',
-                      ),
-                      PieChartSectionData(
-                        value: approved,
-                        color: AppColors.purple,
-                        radius: 46,
-                        title: '',
-                      ),
-                      if (other > 0)
-                        PieChartSectionData(
-                          value: other,
-                          color: AppColors.divider,
-                          radius: 46,
-                          title: '',
-                        ),
-                    ],
-                    centerSpaceRadius: 28,
-                    sectionsSpace: 2,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _LegendItem(
-                        color: AppColors.success,
-                        label: 'Присутствие',
-                        value: '${present.toStringAsFixed(0)}%'),
-                    const SizedBox(height: 8),
-                    _LegendItem(
-                        color: AppColors.error,
-                        label: 'Пропуски',
-                        value: '${absent.toStringAsFixed(0)}%'),
-                    const SizedBox(height: 8),
-                    _LegendItem(
-                        color: AppColors.purple,
-                        label: 'Уважительные',
-                        value: '${approved.toStringAsFixed(0)}%'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopEmployees() {
-    final stats = _employeeStats.take(5).toList();
-    if (stats.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Топ по рабочим часам',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...List.generate(stats.length, (i) {
-            final s = stats[i];
-            final hours = s.totalMinutes ~/ 60;
-            final mins = s.totalMinutes % 60;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: i == 0
-                          ? const Color(0xFFFFF8E1)
-                          : AppColors.divider,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${i + 1}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: i == 0
-                              ? const Color(0xFFFFB300)
-                              : AppColors.textHint,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            if (s.lateCount > 0) ...[
-                              Text(
-                                'Опоздания: ${s.lateCount}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.warning,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            if (s.absentCount > 0)
-                              Text(
-                                'Пропуски: ${s.absentCount}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.error,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${hours}ч ${mins}м', // ignore: unnecessary_brace_in_string_interps
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          _DailyTab(),
+          _WeeklyTab(),
+          _MonthlyTab(),
         ],
       ),
     );
   }
 }
 
-// ─── Helper widgets ───────────────────────────────────────────────────────────
+// ─── DAILY TAB ────────────────────────────────────────────────────────────────
 
-class _PeriodTab extends StatelessWidget {
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
+class _DailyTab extends ConsumerStatefulWidget {
+  const _DailyTab();
 
-  const _PeriodTab(
-      {required this.label, required this.isActive, required this.onTap});
+  @override
+  ConsumerState<_DailyTab> createState() => _DailyTabState();
+}
+
+class _DailyTabState extends ConsumerState<_DailyTab> {
+  DateTime _date = DateTime.now();
+  bool _loading = false;
+  Map<String, dynamic>? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(apiServiceProvider);
+      final dateStr = DateFormat('yyyy-MM-dd').format(_date);
+      final data = await api.getDailyReport(dateStr);
+      if (mounted) setState(() => _data = data);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ошибка загрузки: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+      locale: const Locale('ru'),
+    );
+    if (picked != null && picked != _date) {
+      setState(() => _date = picked);
+      _load();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isActive ? Colors.white : AppColors.textHint,
-                fontFamily: 'Inter',
+    final summary = _data?['summary'] as Map<String, dynamic>?;
+    final detail = (_data?['detail'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    return Column(
+      children: [
+        _DatePickerBar(
+          label: DateFormat('d MMMM yyyy', 'ru').format(_date),
+          onPrev: () {
+            setState(() => _date = _date.subtract(const Duration(days: 1)));
+            _load();
+          },
+          onNext: _date.day == DateTime.now().day &&
+                  _date.month == DateTime.now().month
+              ? null
+              : () {
+                  setState(() => _date = _date.add(const Duration(days: 1)));
+                  _load();
+                },
+          onPick: _pickDate,
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _ErrorView(message: _error!, onRetry: _load)
+                  : _data == null
+                      ? const SizedBox.shrink()
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: AppColors.primary,
+                          child: ListView(
+                            padding: const EdgeInsets.all(16),
+                            children: [
+                              if (summary != null) ...[
+                                _SummaryGrid(summary: summary),
+                                const SizedBox(height: 16),
+                              ],
+                              if (detail.isNotEmpty) ...[
+                                _SectionTitle(
+                                    title: 'Посещаемость сотрудников',
+                                    count: detail.length),
+                                const SizedBox(height: 8),
+                                _DailyDetailTable(rows: detail),
+                              ] else
+                                const _EmptyCard(
+                                    text: 'Нет данных за выбранный день'),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── WEEKLY TAB ───────────────────────────────────────────────────────────────
+
+class _WeeklyTab extends ConsumerStatefulWidget {
+  const _WeeklyTab();
+
+  @override
+  ConsumerState<_WeeklyTab> createState() => _WeeklyTabState();
+}
+
+class _WeeklyTabState extends ConsumerState<_WeeklyTab> {
+  late DateTime _weekStart;
+  bool _loading = false;
+  Map<String, dynamic>? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _weekStart = today.subtract(Duration(days: today.weekday - 1));
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(apiServiceProvider);
+      final dateStr = DateFormat('yyyy-MM-dd').format(_weekStart);
+      final data = await api.getWeeklyReport(weekStart: dateStr);
+      if (mounted) setState(() => _data = data);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ошибка загрузки: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final weekEnd = _weekStart.add(const Duration(days: 6));
+    final label =
+        '${DateFormat('d MMM', 'ru').format(_weekStart)} — ${DateFormat('d MMM yyyy', 'ru').format(weekEnd)}';
+
+    final days = (_data?['days'] as Map<String, dynamic>?) ?? {};
+
+    return Column(
+      children: [
+        _DatePickerBar(
+          label: label,
+          onPrev: () {
+            setState(() =>
+                _weekStart = _weekStart.subtract(const Duration(days: 7)));
+            _load();
+          },
+          onNext: _weekStart
+                      .add(const Duration(days: 7))
+                      .isAfter(DateTime.now())
+              ? null
+              : () {
+                  setState(() =>
+                      _weekStart = _weekStart.add(const Duration(days: 7)));
+                  _load();
+                },
+          onPick: null,
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _ErrorView(message: _error!, onRetry: _load)
+                  : _data == null
+                      ? const SizedBox.shrink()
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: AppColors.primary,
+                          child: ListView(
+                            padding: const EdgeInsets.all(16),
+                            children: [
+                              _WeeklyBarChart(days: days, weekStart: _weekStart),
+                              const SizedBox(height: 16),
+                              _WeeklyDayCards(days: days, weekStart: _weekStart),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── MONTHLY TAB ──────────────────────────────────────────────────────────────
+
+class _MonthlyTab extends ConsumerStatefulWidget {
+  const _MonthlyTab();
+
+  @override
+  ConsumerState<_MonthlyTab> createState() => _MonthlyTabState();
+}
+
+class _MonthlyTabState extends ConsumerState<_MonthlyTab> {
+  late int _year;
+  late int _month;
+  bool _loading = false;
+  Map<String, dynamic>? _data;
+  String? _error;
+  String _sortKey = 'days_present';
+  bool _sortDesc = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _year = now.year;
+    _month = now.month;
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(apiServiceProvider);
+      final data = await api.getMonthlyReport(_year, _month);
+      if (mounted) setState(() => _data = data);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ошибка загрузки: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _prevMonth() {
+    setState(() {
+      if (_month == 1) {
+        _month = 12;
+        _year--;
+      } else {
+        _month--;
+      }
+    });
+    _load();
+  }
+
+  void _nextMonth() {
+    final now = DateTime.now();
+    if (_year == now.year && _month == now.month) return;
+    setState(() {
+      if (_month == 12) {
+        _month = 1;
+        _year++;
+      } else {
+        _month++;
+      }
+    });
+    _load();
+  }
+
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _year == now.year && _month == now.month;
+  }
+
+  void _openEmployeeDetail(Map<String, dynamic> emp) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EmployeeDetailSheet(
+        userId: emp['user_id'] as String,
+        fullName: emp['full_name'] as String? ?? '',
+        year: _year,
+        month: _month,
+        apiRef: ref,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = DateFormat('MMMM yyyy', 'ru')
+        .format(DateTime(_year, _month))
+        .replaceFirst(
+            DateFormat('MMMM', 'ru').format(DateTime(_year, _month)),
+            DateFormat('MMMM', 'ru')
+                .format(DateTime(_year, _month))
+                .capitalize());
+
+    final summary = _data?['summary'] as Map<String, dynamic>?;
+    final employees =
+        ((_data?['employees']) as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    final sorted = List<Map<String, dynamic>>.from(employees);
+    sorted.sort((a, b) {
+      final av = a[_sortKey] as num? ?? 0;
+      final bv = b[_sortKey] as num? ?? 0;
+      return _sortDesc ? bv.compareTo(av) : av.compareTo(bv);
+    });
+
+    return Column(
+      children: [
+        _DatePickerBar(
+          label: label,
+          onPrev: _prevMonth,
+          onNext: _isCurrentMonth ? null : _nextMonth,
+          onPick: null,
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? _ErrorView(message: _error!, onRetry: _load)
+                  : _data == null
+                      ? const SizedBox.shrink()
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          color: AppColors.primary,
+                          child: ListView(
+                            padding: const EdgeInsets.all(16),
+                            children: [
+                              if (summary != null) ...[
+                                _SummaryGrid(summary: summary),
+                                const SizedBox(height: 16),
+                              ],
+                              if (sorted.isNotEmpty) ...[
+                                _SectionTitle(
+                                    title: 'Сотрудники',
+                                    count: sorted.length),
+                                const SizedBox(height: 4),
+                                _SortBar(
+                                  sortKey: _sortKey,
+                                  sortDesc: _sortDesc,
+                                  onSort: (key) {
+                                    setState(() {
+                                      if (_sortKey == key) {
+                                        _sortDesc = !_sortDesc;
+                                      } else {
+                                        _sortKey = key;
+                                        _sortDesc = true;
+                                      }
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                ...sorted.map((emp) => _MonthlyEmployeeCard(
+                                      emp: emp,
+                                      onTap: () => _openEmployeeDetail(emp),
+                                    )),
+                              ] else
+                                const _EmptyCard(
+                                    text: 'Нет данных за выбранный месяц'),
+                              const SizedBox(height: 24),
+                            ],
+                          ),
+                        ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── EMPLOYEE DETAIL BOTTOM SHEET ─────────────────────────────────────────────
+
+class _EmployeeDetailSheet extends ConsumerStatefulWidget {
+  final String userId;
+  final String fullName;
+  final int year;
+  final int month;
+  final WidgetRef apiRef;
+
+  const _EmployeeDetailSheet({
+    required this.userId,
+    required this.fullName,
+    required this.year,
+    required this.month,
+    required this.apiRef,
+  });
+
+  @override
+  ConsumerState<_EmployeeDetailSheet> createState() =>
+      _EmployeeDetailSheetState();
+}
+
+class _EmployeeDetailSheetState extends ConsumerState<_EmployeeDetailSheet> {
+  bool _loading = true;
+  Map<String, dynamic>? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final api = widget.apiRef.read(apiServiceProvider);
+      final start = '${widget.year}-${widget.month.toString().padLeft(2, '0')}-01';
+      final lastDay = DateTime(widget.year, widget.month + 1, 0).day;
+      final end =
+          '${widget.year}-${widget.month.toString().padLeft(2, '0')}-$lastDay';
+      final data =
+          await api.getEmployeeReport(widget.userId, startDate: start, endDate: end);
+      if (mounted) setState(() => _data = data);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Ошибка: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = _data?['stats'] as Map<String, dynamic>?;
+    final records =
+        ((_data?['records']) as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (_, controller) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_rounded,
+                      color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.fullName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: AppColors.textHint),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary))
+                  : _error != null
+                      ? _ErrorView(message: _error!, onRetry: _load)
+                      : ListView(
+                          controller: controller,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          children: [
+                            if (stats != null) ...[
+                              _EmployeeStatRow(stats: stats),
+                              const SizedBox(height: 16),
+                            ],
+                            if (records.isNotEmpty) ...[
+                              const _SectionTitle(
+                                  title: 'История посещаемости'),
+                              const SizedBox(height: 8),
+                              ...records.map((r) => _AttendanceRecordTile(r: r)),
+                            ] else
+                              const _EmptyCard(text: 'Нет записей'),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _GridStatCard extends StatelessWidget {
+// ─── REUSABLE COMPONENTS ──────────────────────────────────────────────────────
+
+class _DatePickerBar extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  final VoidCallback? onPick;
+
+  const _DatePickerBar({
+    required this.label,
+    this.onPrev,
+    this.onNext,
+    this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            color: onPrev != null ? AppColors.textPrimary : AppColors.border,
+            onPressed: onPrev,
+          ),
+          GestureDetector(
+            onTap: onPick,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                if (onPick != null) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.expand_more_rounded,
+                      size: 18, color: AppColors.textHint),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded),
+            color: onNext != null ? AppColors.textPrimary : AppColors.border,
+            onPressed: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryGrid extends StatelessWidget {
+  final Map<String, dynamic> summary;
+
+  const _SummaryGrid({required this.summary});
+
+  @override
+  Widget build(BuildContext context) {
+    final total = summary['total_employees'] as int? ?? 0;
+    final present = summary['present'] as int? ?? 0;
+    final inOffice = summary['in_office_now'] as int? ?? 0;
+    final late = summary['late'] as int? ?? 0;
+    final absent = summary['absent'] as int? ?? 0;
+    final rate = summary['attendance_rate'] as double? ?? 0.0;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                value: '$present / $total',
+                label: 'Пришли',
+                icon: Icons.check_circle_rounded,
+                color: AppColors.success,
+                bg: AppColors.successLight,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _StatCard(
+                value: '${rate.toStringAsFixed(0)}%',
+                label: 'Явка',
+                icon: Icons.trending_up_rounded,
+                color: AppColors.primary,
+                bg: AppColors.primaryLight,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                value: '$late',
+                label: 'Опоздали',
+                icon: Icons.timer_outlined,
+                color: AppColors.warning,
+                bg: AppColors.warningLight,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _StatCard(
+                value: '$absent',
+                label: 'Отсутствуют',
+                icon: Icons.cancel_rounded,
+                color: AppColors.error,
+                bg: AppColors.errorLight,
+              ),
+            ),
+          ],
+        ),
+        if (inOffice > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.business_rounded,
+                    color: AppColors.primary, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Сейчас в офисе: $inOffice чел.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
   final String value;
   final String label;
   final IconData icon;
   final Color color;
   final Color bg;
 
-  const _GridStatCard({
+  const _StatCard({
     required this.value,
     required this.label,
     required this.icon,
@@ -646,36 +759,38 @@ class _GridStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: color, size: 16),
+            padding: const EdgeInsets.all(8),
+            decoration:
+                BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 18),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                  fontFamily: 'Inter',
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    fontFamily: 'Inter',
+                  ),
                 ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textHint,
-                  fontFamily: 'Inter',
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                    fontFamily: 'Inter',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -683,54 +798,924 @@ class _GridStatCard extends StatelessWidget {
   }
 }
 
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-  final String value;
+class _DailyDetailTable extends StatelessWidget {
+  final List<Map<String, dynamic>> rows;
 
-  const _LegendItem(
-      {required this.color, required this.label, required this.value});
+  const _DailyDetailTable({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: const Row(
+              children: [
+                Expanded(
+                    flex: 3,
+                    child: _HeaderCell(text: 'Сотрудник')),
+                Expanded(child: _HeaderCell(text: 'Приход')),
+                Expanded(child: _HeaderCell(text: 'Уход')),
+                Expanded(child: _HeaderCell(text: 'Статус')),
+              ],
+            ),
+          ),
+          ...rows.asMap().entries.map((e) {
+            final i = e.key;
+            final r = e.value;
+            return Container(
+              decoration: BoxDecoration(
+                border: i < rows.length - 1
+                    ? const Border(
+                        bottom: BorderSide(color: AppColors.divider))
+                    : null,
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          r['employee_name'] as String? ?? '—',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if ((r['late_minutes'] as int? ?? 0) > 0)
+                          Text(
+                            '+${r['late_minutes']}мин',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.warning,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      r['check_in_time'] as String? ?? '—',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Inter'),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      r['check_out_time'] as String? ?? '—',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Inter'),
+                    ),
+                  ),
+                  Expanded(
+                    child: _StatusBadge(
+                        status: r['status'] as String? ?? ''),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyBarChart extends StatelessWidget {
+  final Map<String, dynamic> days;
+  final DateTime weekStart;
+
+  const _WeeklyBarChart({required this.days, required this.weekStart});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = List.generate(7, (i) {
+      final d = weekStart.add(Duration(days: i));
+      final key = DateFormat('yyyy-MM-dd').format(d);
+      final summary = days[key] as Map<String, dynamic>?;
+      return MapEntry(d, summary?['present'] as int? ?? 0);
+    });
+
+    final maxVal =
+        entries.map((e) => e.value).fold(0, (a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Присутствие по дням',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 140,
+            child: BarChart(
+              BarChartData(
+                maxY: (maxVal + 2).toDouble(),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (v) => const FlLine(
+                      color: AppColors.divider, strokeWidth: 1),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      interval: maxVal > 0 ? (maxVal / 3).ceilToDouble() : 1,
+                      getTitlesWidget: (v, _) => Text('${v.toInt()}',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textHint,
+                              fontFamily: 'Inter')),
+                    ),
+                  ),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 22,
+                      getTitlesWidget: (v, _) {
+                        final i = v.toInt();
+                        if (i < 0 || i >= entries.length) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            DateFormat('E', 'ru').format(entries[i].key),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textHint,
+                                fontFamily: 'Inter'),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: entries.asMap().entries.map((e) {
+                  final isToday = e.value.key.day == DateTime.now().day &&
+                      e.value.key.month == DateTime.now().month;
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: e.value.value.toDouble(),
+                        color: isToday
+                            ? AppColors.primary
+                            : AppColors.primary.withOpacity(0.4),
+                        width: 20,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(6)),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyDayCards extends StatelessWidget {
+  final Map<String, dynamic> days;
+  final DateTime weekStart;
+
+  const _WeeklyDayCards({required this.days, required this.weekStart});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionTitle(title: 'По дням'),
+        const SizedBox(height: 8),
+        ...List.generate(7, (i) {
+          final d = weekStart.add(Duration(days: i));
+          final key = DateFormat('yyyy-MM-dd').format(d);
+          final summary = days[key] as Map<String, dynamic>?;
+          if (summary == null) return const SizedBox.shrink();
+          final present = summary['present'] as int? ?? 0;
+          final late = summary['late'] as int? ?? 0;
+          final absent = summary['absent'] as int? ?? 0;
+          final total = summary['total_employees'] as int? ?? 0;
+          final isToday = d.day == DateTime.now().day &&
+              d.month == DateTime.now().month;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: isToday ? AppColors.primary : AppColors.border,
+                  width: isToday ? 1.5 : 1),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 44,
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('E', 'ru').format(d).toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: isToday
+                              ? AppColors.primary
+                              : AppColors.textHint,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      Text(
+                        DateFormat('d').format(d),
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: isToday
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(width: 1, height: 36, color: AppColors.divider),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _MiniStat(
+                          value: '$present/$total',
+                          label: 'Пришли',
+                          color: AppColors.success),
+                      _MiniStat(
+                          value: '$late',
+                          label: 'Опоздали',
+                          color: AppColors.warning),
+                      _MiniStat(
+                          value: '$absent',
+                          label: 'Отсутствие',
+                          color: AppColors.error),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _MonthlyEmployeeCard extends StatelessWidget {
+  final Map<String, dynamic> emp;
+  final VoidCallback onTap;
+
+  const _MonthlyEmployeeCard({required this.emp, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = emp['full_name'] as String? ?? '—';
+    final team = emp['team_name'] as String?;
+    final daysPresent = emp['days_present'] as int? ?? 0;
+    final daysLate = emp['days_late'] as int? ?? 0;
+    final daysAbsent = emp['days_absent'] as int? ?? 0;
+    final workMin = emp['total_work_minutes'] as int? ?? 0;
+    final workH = workMin ~/ 60;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (team != null)
+                    Text(
+                      team,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textHint,
+                          fontFamily: 'Inter'),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MonthBadge(
+                    value: '$daysPresent',
+                    label: 'дней',
+                    color: AppColors.success),
+                const SizedBox(width: 6),
+                if (daysLate > 0)
+                  _MonthBadge(
+                      value: '$daysLate',
+                      label: 'опозд',
+                      color: AppColors.warning),
+                if (daysAbsent > 0) ...[
+                  const SizedBox(width: 6),
+                  _MonthBadge(
+                      value: '$daysAbsent',
+                      label: 'пропуск',
+                      color: AppColors.error),
+                ],
+                const SizedBox(width: 6),
+                _MonthBadge(
+                    value: '${workH}ч', // ignore: unnecessary_brace_in_string_interps
+                    label: 'всего',
+                    color: AppColors.primary),
+              ],
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 16, color: AppColors.textHint),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmployeeStatRow extends StatelessWidget {
+  final Map<String, dynamic> stats;
+
+  const _EmployeeStatRow({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final daysPresent = stats['days_present'] as int? ?? 0;
+    final daysLate = stats['days_late'] as int? ?? 0;
+    final lateMins = stats['total_late_minutes'] as int? ?? 0;
+    final workMins = stats['total_work_minutes'] as int? ?? 0;
+    final workH = workMins ~/ 60;
+    final workM = workMins % 60;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _EmpStatItem(value: '$daysPresent', label: 'Дней\nприсутствия'),
+          _EmpStatItem(value: '$daysLate', label: 'Дней\nопозданий'),
+          _EmpStatItem(
+              value: '${lateMins}м', // ignore: unnecessary_brace_in_string_interps
+              label: 'Всего\nопоздал'),
+          _EmpStatItem(
+              value: '${workH}ч ${workM}м', // ignore: unnecessary_brace_in_string_interps
+              label: 'Рабочие\nчасы'),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceRecordTile extends StatelessWidget {
+  final Map<String, dynamic> r;
+
+  const _AttendanceRecordTile({required this.r});
+
+  @override
+  Widget build(BuildContext context) {
+    final date = r['date'] as String? ?? '';
+    final checkIn = r['check_in'] as String?;
+    final checkOut = r['check_out'] as String?;
+    final status = r['status'] as String? ?? '';
+    final lateMin = r['late_minutes'] as int? ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatDate(date),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                if (lateMin > 0)
+                  Text(
+                    '+${lateMin}мин', // ignore: unnecessary_brace_in_string_interps
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.warning,
+                        fontFamily: 'Inter'),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Text(
+              checkIn ?? '—',
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontFamily: 'Inter'),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              checkOut ?? '—',
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontFamily: 'Inter'),
+            ),
+          ),
+          _StatusBadge(status: status),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String date) {
+    try {
+      final d = DateTime.parse(date);
+      return DateFormat('d MMM', 'ru').format(d);
+    } catch (_) {
+      return date;
+    }
+  }
+}
+
+class _SortBar extends StatelessWidget {
+  final String sortKey;
+  final bool sortDesc;
+  final ValueChanged<String> onSort;
+
+  const _SortBar({
+    required this.sortKey,
+    required this.sortDesc,
+    required this.onSort,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _SortChip(
+            label: 'Присутствие',
+            sortKey: 'days_present',
+            currentKey: sortKey,
+            sortDesc: sortDesc,
+            onSort: onSort,
+          ),
+          const SizedBox(width: 6),
+          _SortChip(
+            label: 'Опоздания',
+            sortKey: 'days_late',
+            currentKey: sortKey,
+            sortDesc: sortDesc,
+            onSort: onSort,
+          ),
+          const SizedBox(width: 6),
+          _SortChip(
+            label: 'Часы',
+            sortKey: 'total_work_minutes',
+            currentKey: sortKey,
+            sortDesc: sortDesc,
+            onSort: onSort,
+          ),
+          const SizedBox(width: 6),
+          _SortChip(
+            label: 'Пропуски',
+            sortKey: 'days_absent',
+            currentKey: sortKey,
+            sortDesc: sortDesc,
+            onSort: onSort,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  final String label;
+  final String sortKey;
+  final String currentKey;
+  final bool sortDesc;
+  final ValueChanged<String> onSort;
+
+  const _SortChip({
+    required this.label,
+    required this.sortKey,
+    required this.currentKey,
+    required this.sortDesc,
+    required this.onSort,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = sortKey == currentKey;
+    return GestureDetector(
+      onTap: () => onSort(sortKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: isActive ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? Colors.white : AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(width: 2),
+              Icon(
+                sortDesc ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                size: 12,
+                color: Colors.white,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color, bg) = switch (status) {
+      'PRESENT' => ('Пришёл', AppColors.success, AppColors.successLight),
+      'LATE' => ('Опоздал', AppColors.warning, AppColors.warningLight),
+      'ABSENT' => ('Отсутствие', AppColors.error, AppColors.errorLight),
+      'INCOMPLETE' => ('Неполный', AppColors.warning, AppColors.warningLight),
+      'APPROVED_ABSENCE' => ('Уважит.', AppColors.purple, AppColors.purpleLight),
+      'OVERTIME' => ('Сверхур.', AppColors.primary, AppColors.primaryLight),
+      'EARLY_LEAVE' => ('Ранний уход', AppColors.warning, AppColors.warningLight),
+      'MANUAL' => ('Вручную', AppColors.textHint, AppColors.background),
+      _ => (status, AppColors.textHint, AppColors.background),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: color,
+          fontFamily: 'Inter',
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final int? count;
+
+  const _SectionTitle({required this.title, this.count});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              fontFamily: 'Inter',
-            ),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            fontFamily: 'Inter',
           ),
         ),
+        if (count != null) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _EmptyCard extends StatelessWidget {
+  final String text;
+
+  const _EmptyCard({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(
+              color: AppColors.textHint, fontSize: 14, fontFamily: 'Inter'),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontFamily: 'Inter'),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Повторить'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderCell extends StatelessWidget {
+  final String text;
+
+  const _HeaderCell({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textHint,
+        fontFamily: 'Inter',
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const _MiniStat(
+      {required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
         Text(
           value,
           style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
             color: color,
             fontFamily: 'Inter',
           ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 10, color: AppColors.textHint, fontFamily: 'Inter'),
         ),
       ],
     );
   }
 }
 
-class _EmployeeStat {
-  final String id;
-  final String name;
-  int totalMinutes = 0;
-  int lateCount = 0;
-  int absentCount = 0;
+class _MonthBadge extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
 
-  _EmployeeStat({required this.id, required this.name});
+  const _MonthBadge(
+      {required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: color,
+            fontFamily: 'Inter',
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 9, color: AppColors.textHint, fontFamily: 'Inter'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmpStatItem extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _EmpStatItem({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: AppColors.primary,
+            fontFamily: 'Inter',
+          ),
+        ),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+              fontFamily: 'Inter'),
+        ),
+      ],
+    );
+  }
+}
+
+extension on String {
+  String capitalize() => isEmpty ? this : this[0].toUpperCase() + substring(1);
 }
