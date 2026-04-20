@@ -255,7 +255,7 @@ class _WeeklyTabState extends ConsumerState<_WeeklyTab> {
                           child: ListView(
                             padding: const EdgeInsets.all(16),
                             children: [
-                              _WeeklyBarChart(days: days, weekStart: _weekStart),
+                              _WeeklyLineChart(days: days, weekStart: _weekStart),
                               const SizedBox(height: 16),
                               _WeeklyDayCards(days: days, weekStart: _weekStart),
                               const SizedBox(height: 24),
@@ -904,26 +904,34 @@ class _DailyDetailTable extends StatelessWidget {
   }
 }
 
-class _WeeklyBarChart extends StatelessWidget {
+class _WeeklyLineChart extends StatelessWidget {
   final Map<String, dynamic> days;
   final DateTime weekStart;
 
-  const _WeeklyBarChart({required this.days, required this.weekStart});
+  const _WeeklyLineChart({required this.days, required this.weekStart});
 
   @override
   Widget build(BuildContext context) {
-    final entries = List.generate(7, (i) {
-      final d = weekStart.add(Duration(days: i));
-      final key = DateFormat('yyyy-MM-dd').format(d);
-      final summary = days[key] as Map<String, dynamic>?;
-      return MapEntry(d, summary?['present'] as int? ?? 0);
-    });
+    final dates = List.generate(7, (i) => weekStart.add(Duration(days: i)));
 
-    final maxVal =
-        entries.map((e) => e.value).fold(0, (a, b) => a > b ? a : b);
+    List<FlSpot> spots(String field) => dates.asMap().entries.map((e) {
+          final key = DateFormat('yyyy-MM-dd').format(e.value);
+          final summary = days[key] as Map<String, dynamic>?;
+          return FlSpot(
+              e.key.toDouble(), (summary?[field] as int? ?? 0).toDouble());
+        }).toList();
+
+    final presentSpots = spots('present');
+    final lateSpots = spots('late');
+    final absentSpots = spots('absent');
+
+    final maxVal = [presentSpots, lateSpots, absentSpots]
+        .expand((s) => s)
+        .map((s) => s.y)
+        .fold(0.0, (a, b) => a > b ? a : b);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
@@ -933,7 +941,7 @@ class _WeeklyBarChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Присутствие по дням',
+            'Посещаемость по дням',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -941,29 +949,44 @@ class _WeeklyBarChart extends StatelessWidget {
               fontFamily: 'Inter',
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 6),
+          // Легенда
+          Row(
+            children: [
+              _LegendDot(color: AppColors.success, label: 'Пришли'),
+              const SizedBox(width: 14),
+              _LegendDot(color: AppColors.warning, label: 'Опоздали'),
+              const SizedBox(width: 14),
+              _LegendDot(color: AppColors.error, label: 'Отсутствие'),
+            ],
+          ),
+          const SizedBox(height: 16),
           SizedBox(
-            height: 140,
-            child: BarChart(
-              BarChartData(
-                maxY: (maxVal + 2).toDouble(),
+            height: 160,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: maxVal < 1 ? 5 : maxVal + 2,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (v) => const FlLine(
+                  getDrawingHorizontalLine: (_) => const FlLine(
                       color: AppColors.divider, strokeWidth: 1),
                 ),
+                borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 24,
-                      interval: maxVal > 0 ? (maxVal / 3).ceilToDouble() : 1,
-                      getTitlesWidget: (v, _) => Text('${v.toInt()}',
-                          style: const TextStyle(
-                              fontSize: 10,
-                              color: AppColors.textHint,
-                              fontFamily: 'Inter')),
+                      interval: maxVal > 0 ? (maxVal / 4).ceilToDouble() : 1,
+                      getTitlesWidget: (v, _) => Text(
+                        '${v.toInt()}',
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textHint,
+                            fontFamily: 'Inter'),
+                      ),
                     ),
                   ),
                   rightTitles: const AxisTitles(
@@ -976,47 +999,112 @@ class _WeeklyBarChart extends StatelessWidget {
                       reservedSize: 22,
                       getTitlesWidget: (v, _) {
                         final i = v.toInt();
-                        if (i < 0 || i >= entries.length) {
+                        if (i < 0 || i >= dates.length) {
                           return const SizedBox.shrink();
                         }
+                        final isToday = dates[i].day == DateTime.now().day &&
+                            dates[i].month == DateTime.now().month;
                         return Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            DateFormat('E', 'ru').format(entries[i].key),
-                            style: const TextStyle(
-                                fontSize: 10,
-                                color: AppColors.textHint,
-                                fontFamily: 'Inter'),
+                            DateFormat('E', 'ru').format(dates[i]),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: isToday
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: isToday
+                                  ? AppColors.primary
+                                  : AppColors.textHint,
+                              fontFamily: 'Inter',
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
                 ),
-                borderData: FlBorderData(show: false),
-                barGroups: entries.asMap().entries.map((e) {
-                  final isToday = e.value.key.day == DateTime.now().day &&
-                      e.value.key.month == DateTime.now().month;
-                  return BarChartGroupData(
-                    x: e.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: e.value.value.toDouble(),
-                        color: isToday
-                            ? AppColors.primary
-                            : AppColors.primary.withOpacity(0.4),
-                        width: 20,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(6)),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => AppColors.textPrimary,
+                    getTooltipItems: (spots) => spots.map((s) {
+                      final labels = ['Пришли', 'Опоздали', 'Отсутствие'];
+                      final colors = [
+                        AppColors.success,
+                        AppColors.warning,
+                        AppColors.error
+                      ];
+                      return LineTooltipItem(
+                        '${labels[s.barIndex]}: ${s.y.toInt()}',
+                        TextStyle(
+                          color: colors[s.barIndex],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                lineBarsData: [
+                  _line(presentSpots, AppColors.success),
+                  _line(lateSpots, AppColors.warning),
+                  _line(absentSpots, AppColors.error),
+                ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  LineChartBarData _line(List<FlSpot> spots, Color color) => LineChartBarData(
+        spots: spots,
+        isCurved: true,
+        curveSmoothness: 0.35,
+        color: color,
+        barWidth: 2.5,
+        isStrokeCapRound: true,
+        dotData: FlDotData(
+          show: true,
+          getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+            radius: 3.5,
+            color: color,
+            strokeWidth: 2,
+            strokeColor: Colors.white,
+          ),
+        ),
+        belowBarData: BarAreaData(
+          show: true,
+          color: color.withOpacity(0.08),
+        ),
+      );
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter'),
+        ),
+      ],
     );
   }
 }
