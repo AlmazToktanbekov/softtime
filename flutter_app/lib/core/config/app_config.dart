@@ -4,7 +4,7 @@ class AppConfig {
   // Или замените defaultValue на URL вашего сервера перед сборкой APK/IPA.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.50.12:8000',
+    defaultValue: 'https://api.softjol.site',
   );
 
   static const int connectTimeout = 15000;

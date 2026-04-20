@@ -27,8 +27,12 @@ class Settings(BaseSettings):
     WORK_END_MINUTE: int = 0
     GRACE_PERIOD_MINUTES: int = 5
 
-    # CORS
-    BACKEND_CORS_ORIGINS: list = ["*"]
+    # CORS — admin_web использует same-origin, мобильное приложение CORS не использует
+    BACKEND_CORS_ORIGINS: list = [
+        "https://api.softjol.site",
+        "https://softtime.softjol.site",
+        "https://softjol.site",
+    ]
 
     # Auto-create tables on startup — отключено, используется Alembic
     AUTO_CREATE_TABLES: bool = False

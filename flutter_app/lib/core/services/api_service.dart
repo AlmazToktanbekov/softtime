@@ -22,10 +22,15 @@ class ApiService {
 
   Future<void> init() async {
     final saved = await _storage.read(key: _baseUrlStorageKey);
-    if (saved != null && saved.trim().isNotEmpty) {
+    final isLocalhost = saved != null &&
+        (saved.contains('127.0.0.1') ||
+            saved.contains('localhost') ||
+            saved.contains('10.0.2.2'));
+    if (saved != null && saved.trim().isNotEmpty && !isLocalhost) {
       _baseUrl = _normalizeBaseUrl(saved);
     } else {
       _baseUrl = _normalizeBaseUrl(AppConfig.baseUrl);
+      await _storage.write(key: _baseUrlStorageKey, value: _baseUrl);
     }
     _dio = _buildDio(_baseUrl);
   }

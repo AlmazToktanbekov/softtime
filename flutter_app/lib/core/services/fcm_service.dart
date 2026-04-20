@@ -14,7 +14,7 @@ import 'api_service.dart';
 class FcmService {
   static Future<void> init() async {
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp().timeout(const Duration(seconds: 4));
     } catch (e) {
       log('[FCM] Firebase не инициализирован: $e\n'
           'Добавьте google-services.json / GoogleService-Info.plist из Firebase Console.');
@@ -24,11 +24,15 @@ class FcmService {
     final messaging = FirebaseMessaging.instance;
 
     // Запрос разрешения (iOS / macOS)
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      ).timeout(const Duration(seconds: 4));
+    } catch (e) {
+      log('[FCM] requestPermission timeout/error: $e');
+    }
 
     // Получаем токен и сохраняем на сервере
     try {

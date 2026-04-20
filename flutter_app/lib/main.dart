@@ -23,8 +23,11 @@ void main() async {
   await initializeDateFormatting('ru', null);
   await ApiService().init();
 
-  // Firebase + FCM (работает только если добавлены google-services.json / GoogleService-Info.plist)
-  await FcmService.init();
+  // Firebase + FCM — таймаут 5 сек чтобы не вешать запуск если Firebase недоступен
+  await FcmService.init().timeout(
+    const Duration(seconds: 5),
+    onTimeout: () {},
+  );
 
   runApp(const ProviderScope(child: SoftTimeApp()));
 }
