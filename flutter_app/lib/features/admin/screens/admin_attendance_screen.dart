@@ -329,9 +329,12 @@ class _AdminAttendanceScreenState
         const SizedBox(height: 10),
         ...List.generate(_records.length, (i) {
           final r = _records[i];
+          final name = _findName(r.userId);
+          final checkIn = r.formattedCheckIn;
+          final checkOut = r.formattedCheckOut;
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
@@ -348,7 +351,7 @@ class _AdminAttendanceScreenState
                   ),
                   child: Center(
                     child: Text(
-                      _findName(r.userId).substring(0, 1).toUpperCase(),
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
                       style: const TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w700,
@@ -364,7 +367,9 @@ class _AdminAttendanceScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _findName(r.userId),
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -372,23 +377,48 @@ class _AdminAttendanceScreenState
                           fontFamily: 'Inter',
                         ),
                       ),
-                      Text(
-                        '${r.formattedCheckIn} → ${r.formattedCheckOut}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(Icons.login_rounded, size: 12, color: AppColors.success),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(checkIn,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.success,
+                                    fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.logout_rounded, size: 12, color: AppColors.error),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(checkOut,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 12, color: AppColors.error,
+                                    fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                StatusBadge(status: r.status),
                 const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () => _showManualCorrectionForRecord(r),
-                  child: const Icon(Icons.edit_outlined,
-                      size: 18, color: AppColors.textHint),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      StatusBadge(status: r.status),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => _showManualCorrectionForRecord(r),
+                        child: const Icon(Icons.edit_outlined,
+                            size: 18, color: AppColors.textHint),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -604,26 +634,28 @@ class _AdminAttendanceScreenState
               fontWeight: FontWeight.w700, fontFamily: 'Inter', fontSize: 15),
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: checkInCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Время прихода (HH:MM)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: checkOutCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Время ухода (HH:MM)'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteCtrl,
-              decoration: const InputDecoration(labelText: 'Причина'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: checkInCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Время прихода (HH:MM)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: checkOutCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Время ухода (HH:MM)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(labelText: 'Причина'),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

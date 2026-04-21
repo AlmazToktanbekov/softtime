@@ -649,7 +649,7 @@ class _SummaryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = summary['total_employees'] as int? ?? 0;
-    final present = summary['present'] as int? ?? 0;
+    final workedToday = (summary['worked_today'] as int?) ?? (summary['present'] as int?) ?? 0;
     final inOffice = summary['in_office_now'] as int? ?? 0;
     final late = summary['late'] as int? ?? 0;
     final absent = summary['absent'] as int? ?? 0;
@@ -661,7 +661,7 @@ class _SummaryGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _StatCard(
-                value: '$present / $total',
+                value: '$workedToday / $total',
                 label: 'Пришли',
                 icon: Icons.check_circle_rounded,
                 color: AppColors.success,

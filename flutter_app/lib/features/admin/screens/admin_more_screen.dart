@@ -142,24 +142,6 @@ class AdminMoreScreen extends ConsumerWidget {
             subtitle: 'Управление разрешёнными IP/подсетями',
             onTap: () => context.push('/admin/networks'),
           ),
-          const SizedBox(height: 8),
-          _ManageItem(
-            icon: Icons.history_rounded,
-            iconColor: AppColors.textSecondary,
-            iconBg: AppColors.divider,
-            title: 'Аудит-лог',
-            subtitle: 'История действий администратора',
-            onTap: () => _showComingSoon(context, 'Аудит-лог'),
-          ),
-          const SizedBox(height: 8),
-          _ManageItem(
-            icon: Icons.settings_rounded,
-            iconColor: AppColors.textSecondary,
-            iconBg: AppColors.divider,
-            title: 'Настройки',
-            subtitle: 'Рабочее время, минимум часов',
-            onTap: () => _showComingSoon(context, 'Настройки'),
-          ),
 
           const SizedBox(height: 20),
           const _SectionTitle('Аккаунт'),
@@ -176,15 +158,6 @@ class AdminMoreScreen extends ConsumerWidget {
 
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String name) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name — скоро будет доступно'),
-        backgroundColor: AppColors.textSecondary,
       ),
     );
   }

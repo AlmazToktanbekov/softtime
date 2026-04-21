@@ -185,6 +185,9 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
                               final emp = _filtered[i];
                               return _EmployeeCard(
                                 emp: emp,
+                                resolvedAvatarUrl: emp.avatarUrl != null
+                                    ? ref.read(apiServiceProvider).mediaAbsoluteUrl(emp.avatarUrl)
+                                    : null,
                                 onApprove: emp.status == 'PENDING'
                                     ? () => _updateStatus(emp.id, 'ACTIVE')
                                     : null,
@@ -198,13 +201,6 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
                   ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddDialog,
-        icon: const Icon(Icons.person_add_rounded),
-        label: const Text('Добавить'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
       ),
     );
   }
@@ -234,12 +230,16 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
   }
 
   void _showEmployeeDetail(EmployeeModel emp) {
+    final resolvedUrl = emp.avatarUrl != null
+        ? ref.read(apiServiceProvider).mediaAbsoluteUrl(emp.avatarUrl)
+        : null;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _EmployeeDetailSheet(
         emp: emp,
+        resolvedAvatarUrl: resolvedUrl,
         onStatusChange: (status) => _updateStatus(emp.id, status),
         onRoleChange: (role) => _updateRole(emp.id, role),
       ),
@@ -253,116 +253,20 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
     } catch (_) {}
   }
 
-  Future<void> _showAddDialog() async {
-    final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final userCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    String selectedRole = 'EMPLOYEE';
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text(
-            'Новый сотрудник',
-            style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter'),
-          ),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _field(nameCtrl, 'ФИО *'),
-                const SizedBox(height: 12),
-                _field(emailCtrl, 'Email *'),
-                const SizedBox(height: 12),
-                _field(phoneCtrl, 'Телефон'),
-                const SizedBox(height: 12),
-                _field(userCtrl, 'Логин *'),
-                const SizedBox(height: 12),
-                _field(passCtrl, 'Пароль *', obscure: true),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(labelText: 'Роль'),
-                  items: const [
-                    DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')),
-                    DropdownMenuItem(value: 'TEAM_LEAD', child: Text('Ментор')),
-                    DropdownMenuItem(value: 'INTERN', child: Text('Стажёр')),
-                  ],
-                  onChanged: (v) => setS(() => selectedRole = v ?? 'EMPLOYEE'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty ||
-                    emailCtrl.text.trim().isEmpty ||
-                    userCtrl.text.trim().isEmpty ||
-                    passCtrl.text.isEmpty) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                    content: Text('Заполните обязательные поля (*)'),
-                    backgroundColor: AppColors.error,
-                  ));
-                  return;
-                }
-                try {
-                  await ref.read(apiServiceProvider).createEmployee({
-                    'full_name': nameCtrl.text.trim(),
-                    'email': emailCtrl.text.trim(),
-                    if (phoneCtrl.text.trim().isNotEmpty)
-                      'phone': phoneCtrl.text.trim(),
-                    'username': userCtrl.text.trim(),
-                    'password': passCtrl.text,
-                    'role': selectedRole,
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _load();
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text('Ошибка: $e'),
-                      backgroundColor: AppColors.error,
-                    ));
-                  }
-                }
-              },
-              child: const Text('Создать'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _field(TextEditingController ctrl, String label,
-      {bool obscure = false}) {
-    return TextField(
-        controller: ctrl,
-        obscureText: obscure,
-        decoration: InputDecoration(labelText: label));
-  }
 }
 
 // ─── Employee Card ────────────────────────────────────────────────────────────
 
 class _EmployeeCard extends StatelessWidget {
   final EmployeeModel emp;
+  final String? resolvedAvatarUrl;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
   final VoidCallback onTap;
 
   const _EmployeeCard({
     required this.emp,
+    this.resolvedAvatarUrl,
     this.onApprove,
     this.onReject,
     required this.onTap,
@@ -439,16 +343,36 @@ class _EmployeeCard extends StatelessWidget {
                     color: AppColors.primaryLight,
                     shape: BoxShape.circle,
                   ),
-                  child: Center(
-                    child: Text(
-                      emp.fullName.substring(0, 1).toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
+                  child: ClipOval(
+                    child: resolvedAvatarUrl != null && resolvedAvatarUrl!.isNotEmpty
+                        ? Image.network(
+                            resolvedAvatarUrl!,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                emp.fullName.substring(0, 1).toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 17,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              emp.fullName.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -598,11 +522,13 @@ class _EmployeeCard extends StatelessWidget {
 
 class _EmployeeDetailSheet extends StatelessWidget {
   final EmployeeModel emp;
+  final String? resolvedAvatarUrl;
   final void Function(String) onStatusChange;
   final void Function(String) onRoleChange;
 
   const _EmployeeDetailSheet({
     required this.emp,
+    this.resolvedAvatarUrl,
     required this.onStatusChange,
     required this.onRoleChange,
   });
@@ -639,16 +565,36 @@ class _EmployeeDetailSheet extends StatelessWidget {
                     color: AppColors.primaryLight,
                     shape: BoxShape.circle,
                   ),
-                  child: Center(
-                    child: Text(
-                      emp.fullName.substring(0, 1).toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 22,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
+                  child: ClipOval(
+                    child: resolvedAvatarUrl != null && resolvedAvatarUrl!.isNotEmpty
+                        ? Image.network(
+                            resolvedAvatarUrl!,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                emp.fullName.substring(0, 1).toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 22,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              emp.fullName.substring(0, 1).toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 22,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -694,32 +640,12 @@ class _EmployeeDetailSheet extends StatelessWidget {
           ),
           _actionTile(
             context,
-            icon: Icons.beach_access_rounded,
-            iconColor: AppColors.purple,
-            label: 'В отпуск',
-            onTap: () {
-              Navigator.pop(context);
-              onStatusChange('LEAVE');
-            },
-          ),
-          _actionTile(
-            context,
             icon: Icons.warning_amber_rounded,
             iconColor: AppColors.warning,
             label: 'Предупреждение',
             onTap: () {
               Navigator.pop(context);
               onStatusChange('WARNING');
-            },
-          ),
-          _actionTile(
-            context,
-            icon: Icons.block_rounded,
-            iconColor: AppColors.error,
-            label: 'Заблокировать',
-            onTap: () {
-              Navigator.pop(context);
-              onStatusChange('BLOCKED');
             },
           ),
           const SizedBox(height: 16),

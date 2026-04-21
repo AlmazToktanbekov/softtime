@@ -198,7 +198,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                   name: m.fullName,
                   role: _roleLabel(m.role),
                   status: m.status,
-                  avatarUrl: m.avatarUrl,
+                  avatarUrl: m.avatarUrl != null
+                      ? ref.read(apiServiceProvider).mediaAbsoluteUrl(m.avatarUrl)
+                      : null,
                   isMe: m.id == myId,
                 );
               },

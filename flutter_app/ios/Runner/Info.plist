@@ -26,6 +26,17 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Камера нужна для сканирования QR-кода при отметке прихода/ухода и подтверждения дежурства</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к фото нужен для загрузки фото профиля</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -46,17 +57,6 @@
 				</dict>
 			</array>
 		</dict>
-	</dict>
-	<key>NSCameraUsageDescription</key>
-	<string>Камера нужна для сканирования QR-кода при отметке прихода/ухода и подтверждения дежурства</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Доступ к фото нужен для загрузки фото профиля</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>

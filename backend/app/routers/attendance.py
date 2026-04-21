@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from typing import Union
 
 from app.database import get_db
-from app.models.user import User, UserRole
-from app.models.attendance import Attendance, AttendanceStatus
+from app.models.user import User, UserRole, UserStatus
+from app.models.attendance import Attendance, AttendanceStatus, CheckInStatus, CheckOutStatus
+from app.models.employee_schedule import EmployeeSchedule
 from app.schemas.attendance import (
     CheckInRequest,
     CheckOutRequest,
@@ -32,8 +33,61 @@ from app.services.attendance_service import (
 router = APIRouter(prefix="/attendance", tags=["Посещаемость"])
 
 
+def _fmt_time(dt) -> Optional[str]:
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone().strftime("%H:%M")
+    return dt.strftime("%H:%M")
+
+
 def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
     user = db.query(User).filter(User.id == a.user_id).first()
+    fmt_in = _fmt_time(a.check_in_time)
+    fmt_out = _fmt_time(a.check_out_time)
+
+    early_arrival_minutes = 0
+    early_leave_minutes = 0
+    overtime_minutes = 0
+
+    needs_schedule = (
+        a.check_in_status == CheckInStatus.EARLY_ARRIVAL
+        or a.check_out_status in (CheckOutStatus.LEFT_EARLY, CheckOutStatus.OVERTIME)
+    )
+    if needs_schedule and a.date:
+        schedule = (
+            db.query(EmployeeSchedule)
+            .filter(
+                EmployeeSchedule.user_id == a.user_id,
+                EmployeeSchedule.day_of_week == a.date.weekday(),
+            )
+            .first()
+        )
+        if schedule and schedule.is_working_day:
+            if a.check_in_status == CheckInStatus.EARLY_ARRIVAL and schedule.start_time and a.check_in_time:
+                check_in_naive = (
+                    a.check_in_time.astimezone().replace(tzinfo=None)
+                    if a.check_in_time.tzinfo else a.check_in_time
+                )
+                expected_start = datetime.combine(a.date, schedule.start_time)
+                early_arrival_minutes = max(int((expected_start - check_in_naive).total_seconds() // 60), 0)
+
+            if a.check_out_status == CheckOutStatus.LEFT_EARLY and schedule.end_time and a.check_out_time:
+                check_out_naive = (
+                    a.check_out_time.astimezone().replace(tzinfo=None)
+                    if a.check_out_time.tzinfo else a.check_out_time
+                )
+                expected_end = datetime.combine(a.date, schedule.end_time)
+                early_leave_minutes = max(int((expected_end - check_out_naive).total_seconds() // 60), 0)
+
+            if a.check_out_status == CheckOutStatus.OVERTIME and schedule.end_time and a.check_out_time:
+                check_out_naive = (
+                    a.check_out_time.astimezone().replace(tzinfo=None)
+                    if a.check_out_time.tzinfo else a.check_out_time
+                )
+                expected_end = datetime.combine(a.date, schedule.end_time)
+                overtime_minutes = max(int((check_out_naive - expected_end).total_seconds() // 60), 0)
+
     return AttendanceResponse(
         id=a.id,
         user_id=a.user_id,
@@ -41,20 +95,20 @@ def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
         date=a.date,
         check_in_time=a.check_in_time,
         check_out_time=a.check_out_time,
-        formatted_check_in=None,
-        formatted_check_out=None,
+        formatted_check_in=fmt_in,
+        formatted_check_out=fmt_out,
         work_duration=a.work_duration,
         work_minutes=a.work_minutes,
         status=a.status,
         late_minutes=a.late_minutes or 0,
-        early_arrival_minutes=0,
-        early_leave_minutes=0,
-        overtime_minutes=0,
+        early_arrival_minutes=early_arrival_minutes,
+        early_leave_minutes=early_leave_minutes,
+        overtime_minutes=overtime_minutes,
         underwork_minutes=0,
         is_late=(a.late_minutes or 0) > 0,
-        came_early=False,
-        left_early=a.status == AttendanceStatus.EARLY_LEAVE,
-        left_late=a.status == AttendanceStatus.OVERTIME,
+        came_early=a.check_in_status == CheckInStatus.EARLY_ARRIVAL,
+        left_early=a.check_out_status == CheckOutStatus.LEFT_EARLY,
+        left_late=a.check_out_status == CheckOutStatus.OVERTIME,
         check_in_ip=a.check_in_ip,
         check_out_ip=a.check_out_ip,
         qr_verified_in=bool(a.qr_verified_in),
@@ -335,3 +389,60 @@ def who_is_in_office(
         .all()
     )
     return [_serialize(r, db) for r in rows]
+
+
+@router.get("/today-status")
+def today_office_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Статус офиса на сегодня — доступен всем сотрудникам."""
+    today = date.today()
+
+    non_admin_users = (
+        db.query(User)
+        .filter(
+            User.role.notin_([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+            User.status.in_([UserStatus.ACTIVE, UserStatus.LEAVE, UserStatus.WARNING]),
+            User.deleted_at.is_(None),
+        )
+        .all()
+    )
+    non_admin_ids = {u.id for u in non_admin_users}
+    user_map = {u.id: u.full_name for u in non_admin_users}
+
+    records = (
+        db.query(Attendance)
+        .filter(Attendance.date == today, Attendance.user_id.in_(non_admin_ids))
+        .all()
+    )
+    checked_in_ids = {r.user_id for r in records if r.check_in_time}
+
+    in_office, left, not_arrived = [], [], []
+
+    for r in records:
+        name = user_map.get(r.user_id, "—")
+        entry = {
+            "user_id": str(r.user_id),
+            "name": name,
+            "check_in_time": _fmt_time(r.check_in_time),
+            "check_out_time": _fmt_time(r.check_out_time),
+        }
+        if r.check_in_time and not r.check_out_time:
+            in_office.append(entry)
+        elif r.check_in_time and r.check_out_time:
+            left.append(entry)
+
+    for uid, name in user_map.items():
+        if uid not in checked_in_ids:
+            not_arrived.append({"user_id": str(uid), "name": name})
+
+    return {
+        "in_office": in_office,
+        "left": left,
+        "not_arrived": not_arrived,
+        "total": len(non_admin_users),
+        "in_office_count": len(in_office),
+        "left_count": len(left),
+        "not_arrived_count": len(not_arrived),
+    }

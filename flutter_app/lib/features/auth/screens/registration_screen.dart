@@ -134,8 +134,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       // Phone: user inputs digits after +996, we send +996XXXXXXXXX
       final phone = '+996${_phoneCtrl.text.trim()}';
 
-      // 1. Register
-      await api.register(
+      // 1. Register — response includes upload_token for avatar
+      final regResult = await api.register(
         fullName: _fullNameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         username: _usernameCtrl.text.trim(),
@@ -145,18 +145,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         mentorId: _selectedRole == 'INTERN' ? _selectedMentorId : null,
       );
 
-      // 2. Login to get token (to upload avatar)
-      await api.login(_usernameCtrl.text.trim(), _passwordCtrl.text);
-
-      // 3. Upload avatar
-      try {
-        await api.uploadAvatar(_avatarFile!);
-      } catch (_) {
-        // Avatar upload failed — not critical, continue
+      // 2. Upload avatar using the one-time token (no login needed)
+      final uploadToken = regResult['upload_token'] as String?;
+      if (uploadToken != null && _avatarFile != null) {
+        try {
+          await api.uploadAvatarWithToken(_avatarFile!, uploadToken);
+        } catch (_) {
+          // Avatar upload failed — not critical, continue
+        }
       }
-
-      // 4. Logout (account is PENDING, can't use app yet)
-      await api.logout();
 
       if (mounted) setState(() { _done = true; _loading = false; });
     } on DioException catch (e) {
@@ -399,9 +396,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 onPressed: () => setState(() => _obscurePass = !_obscurePass),
               ),
               validator: (v) {
-                if (v!.length < 8) return 'Минимум 8 символов';
-                if (!v.contains(RegExp(r'[A-ZА-Я]'))) return 'Нужна заглавная буква';
-                if (!v.contains(RegExp(r'\d'))) return 'Нужна хотя бы одна цифра';
+                if (v!.length < 4) return 'Минимум 4 символа';
                 return null;
               },
             ),
@@ -421,8 +416,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               validator: (v) => v!.isEmpty ? 'Повторите пароль' : null,
             ),
-            const SizedBox(height: 8),
-            _PasswordHints(password: _passwordCtrl.text),
             const SizedBox(height: 24),
 
             // ── Error ─────────────────────────────────────────────────────────
@@ -674,44 +667,3 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 }
 
-// ── Password hints ─────────────────────────────────────────────────────────────
-
-class _PasswordHints extends StatelessWidget {
-  final String password;
-  const _PasswordHints({required this.password});
-
-  @override
-  Widget build(BuildContext context) {
-    if (password.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        _hint('Минимум 8 символов', password.length >= 8),
-        _hint('Содержит заглавную букву', password.contains(RegExp(r'[A-ZА-Я]'))),
-        _hint('Содержит цифру', password.contains(RegExp(r'\d'))),
-      ],
-    );
-  }
-
-  Widget _hint(String text, bool met) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(children: [
-        Icon(
-          met ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-          size: 16,
-          color: met ? AppColors.success : AppColors.textHint,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            color: met ? AppColors.success : AppColors.textHint,
-          ),
-        ),
-      ]),
-    );
-  }
-}

@@ -61,12 +61,12 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     Self-registration. Account is created with status PENDING.
     Admin must approve before the user can log in.
     """
-    # Uniqueness checks — 409 Conflict
-    if db.query(User).filter(User.email == data.email).first():
+    # Uniqueness checks — 409 Conflict (exclude soft-deleted users)
+    if db.query(User).filter(User.email == data.email, User.deleted_at.is_(None)).first():
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Email уже зарегистрирован")
-    if db.query(User).filter(User.username == data.username).first():
+    if db.query(User).filter(User.username == data.username, User.deleted_at.is_(None)).first():
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Логин уже занят")
-    if db.query(User).filter(User.phone == data.phone).first():
+    if db.query(User).filter(User.phone == data.phone, User.deleted_at.is_(None)).first():
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Телефон уже зарегистрирован")
 
     mentor_id = None
@@ -120,7 +120,13 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         data={"type": "new_pending_user"},
     )
 
-    return {"message": "Заявка отправлена. Ожидайте подтверждения администратором."}
+    # Возвращаем временный токен, чтобы Flutter мог сразу загрузить аватар
+    access_token, _ = create_access_token(str(user.id), user.role.value)
+    return {
+        "message": "Заявка отправлена. Ожидайте подтверждения администратором.",
+        "upload_token": access_token,
+        "user_id": str(user.id),
+    }
 
 
 # ── POST /login ────────────────────────────────────────────────────────────────

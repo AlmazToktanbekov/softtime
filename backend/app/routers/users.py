@@ -459,11 +459,7 @@ def deactivate_user(
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Нет доступа к этому сотруднику")
 
     old_status = target.status.value
-    suffix = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    target.status = UserStatus.DELETED
-    target.deleted_at = datetime.now(timezone.utc)
-    target.username = _archive_value(target.username, suffix)
-    target.email = _archive_value(target.email, suffix)
+    target.status = UserStatus.BLOCKED
 
     write_audit(
         db,
@@ -472,7 +468,7 @@ def deactivate_user(
         entity="User",
         entity_id=user_id,
         old_value={"status": old_status},
-        new_value={"status": "DELETED"},
+        new_value={"status": "BLOCKED"},
     )
     db.commit()
     return {"message": "Сотрудник деактивирован"}
@@ -499,8 +495,13 @@ def delete_user(
 
     old_snapshot = _serialise(target)
 
+    suffix = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     target.status = UserStatus.DELETED
     target.deleted_at = datetime.now(timezone.utc)
+    target.username = _archive_value(target.username, suffix)
+    target.email = _archive_value(target.email, suffix)
+    if target.phone:
+        target.phone = _archive_value(target.phone, suffix)
 
     write_audit(
         db,

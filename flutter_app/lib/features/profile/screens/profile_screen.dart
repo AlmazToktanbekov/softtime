@@ -397,23 +397,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               width: double.infinity,
               height: 54,
               child: OutlinedButton.icon(
-                onPressed: () => context.push('/home/tasks'),
-                icon: const Icon(Icons.task_alt_rounded, size: 20),
-                label: const Text('Мои задачи',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: OutlinedButton.icon(
                 onPressed: () async {
                   await ref.read(authProvider.notifier).logout();
                   if (context.mounted) context.go('/login');

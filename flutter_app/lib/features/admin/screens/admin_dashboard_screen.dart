@@ -166,7 +166,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
       for (final entry in days.entries) {
         if (map.containsKey(entry.key)) {
           final s = entry.value as Map<String, dynamic>?;
-          map[entry.key] = (s?['present'] as int?) ?? 0;
+          map[entry.key] = (s?['worked_today'] as int?) ?? 0;
         }
       }
     }
@@ -979,6 +979,14 @@ class _FeatureGrid extends StatelessWidget {
         detail:    'Офисный QR',
         iconColor: Color(0xFFDC2626),
         iconBg:    Color(0xFFFEE2E2),
+      ),
+      const _FeatureCardData(
+        route:     '/admin/reports',
+        icon:      Icons.bar_chart_rounded,
+        label:     'Отчёты',
+        detail:    'Статистика',
+        iconColor: Color(0xFF7C3AED),
+        iconBg:    Color(0xFFEDE9FE),
       ),
     ];
 

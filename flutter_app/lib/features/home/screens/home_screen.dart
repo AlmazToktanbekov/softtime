@@ -1,5 +1,5 @@
 // ignore_for_file: deprecated_member_use
-import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,12 +16,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/status_badge.dart';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
-const _kTeal   = Color(0xFF06D6A0);
+const _kTeal = Color(0xFF06D6A0);
 const _kOrange = Color(0xFFFF8C42);
-const _kCard1  = Color(0xFF4361EE);
-const _kCard2  = Color(0xFF3BC9A0);
-const _kCard3  = Color(0xFFFF6B6B);
-const _kBg     = Color(0xFFEEF0F8);
+const _kCard1 = Color.fromARGB(255, 0, 36, 199);
+const _kCard2 = Color(0xFF3BC9A0);
+const _kCard3 = Color(0xFFFF6B6B);
+const _kBg = Color(0xFFEEF0F8);
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -33,34 +33,34 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
   // ── data ──────────────────────────────────────────────────────────────────
-  AttendanceModel?            _today;
-  List<DutyAssignment>        _todayDuties = [];
-  List<News>                  _news = [];
+  AttendanceModel? _today;
+  List<DutyAssignment> _todayDuties = [];
+  List<News> _news = [];
   List<EmployeeScheduleModel> _schedules = [];
-  List<DutySwap>              _incomingSwaps = [];
+  List<DutySwap> _incomingSwaps = [];
+  Map<String, dynamic>? _officeStatus;
 
-  bool   _loadingAttendance = true;
-  bool   _loadingDuty       = true;
-  bool   _loadingNews       = true;
-  bool   _loadingSchedule   = true;
-  bool   _actionLoading     = false;
+  bool _loadingAttendance = true;
+  bool _loadingDuty = true;
+  bool _loadingNews = true;
+  bool _loadingSchedule = true;
+  bool _loadingOffice = true;
+  bool _actionLoading = false;
   String? _error;
-
-  Timer? _timer;
 
   // ── animations ────────────────────────────────────────────────────────────
   late AnimationController _headerCtrl;
   late AnimationController _cardsCtrl;
   late AnimationController _sectionsCtrl;
 
-  late Animation<double>   _headerFade;
-  late Animation<Offset>   _headerSlide;
+  late Animation<double> _headerFade;
+  late Animation<Offset> _headerSlide;
 
-  late Animation<double>   _cardsFade;
-  late Animation<Offset>   _cardsSlide;
+  late Animation<double> _cardsFade;
+  late Animation<Offset> _cardsSlide;
 
-  late List<Animation<double>>  _sectionFades;
-  late List<Animation<Offset>>  _sectionSlides;
+  late List<Animation<double>> _sectionFades;
+  late List<Animation<Offset>> _sectionSlides;
 
   @override
   void initState() {
@@ -69,37 +69,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // header
     _headerCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 600));
-    _headerFade  = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
+    _headerFade = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
     _headerSlide = Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
+        .animate(
+            CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
 
     // stat cards
     _cardsCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 500));
-    _cardsFade  = CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOut);
+    _cardsFade = CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOut);
     _cardsSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOutCubic));
+        .animate(
+            CurvedAnimation(parent: _cardsCtrl, curve: Curves.easeOutCubic));
 
     // sections (staggered)
     _sectionsCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
 
-    _sectionFades = List.generate(5, (i) {
+    _sectionFades = List.generate(6, (i) {
       final start = 0.1 * i;
       return Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
           parent: _sectionsCtrl,
-          curve: Interval(start, (start + 0.5).clamp(0, 1), curve: Curves.easeOut),
+          curve:
+              Interval(start, (start + 0.5).clamp(0, 1), curve: Curves.easeOut),
         ),
       );
     });
 
-    _sectionSlides = List.generate(5, (i) {
+    _sectionSlides = List.generate(6, (i) {
       final start = 0.1 * i;
-      return Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      return Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+          .animate(
         CurvedAnimation(
           parent: _sectionsCtrl,
-          curve: Interval(start, (start + 0.5).clamp(0, 1), curve: Curves.easeOutCubic),
+          curve: Interval(start, (start + 0.5).clamp(0, 1),
+              curve: Curves.easeOutCubic),
         ),
       );
     });
@@ -114,10 +119,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     _loadAll();
-
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
@@ -125,75 +126,107 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _headerCtrl.dispose();
     _cardsCtrl.dispose();
     _sectionsCtrl.dispose();
-    _timer?.cancel();
     super.dispose();
   }
 
   // ── load ──────────────────────────────────────────────────────────────────
   Future<void> _loadAll() async {
-    _loadAttendance();
-    _loadDuty();
-    _loadNews();
-    _loadSchedule();
-    _loadIncomingSwaps();
+    await Future.wait([
+      _loadAttendance(),
+      _loadDuty(),
+      _loadNews(),
+      _loadSchedule(),
+      _loadIncomingSwaps(),
+      _loadOfficeStatus(),
+    ]);
+  }
+
+  Future<void> _loadOfficeStatus() async {
+    if (mounted) setState(() => _loadingOffice = true);
+    Map<String, dynamic>? data;
+    try {
+      data = await ref.read(apiServiceProvider).getTodayOfficeStatus();
+    } catch (e) {
+      debugPrint('loadOfficeStatus error: $e');
+    }
+    if (mounted)
+      setState(() {
+        _officeStatus = data;
+        _loadingOffice = false;
+      });
   }
 
   Future<void> _loadIncomingSwaps() async {
     try {
       final swaps = await ref.read(apiServiceProvider).getIncomingSwaps();
       if (mounted) {
-        setState(() => _incomingSwaps = swaps.where((s) => s.status == 'pending').toList());
+        setState(() => _incomingSwaps =
+            swaps.where((s) => s.status == 'pending').toList());
       }
     } catch (_) {}
   }
 
   Future<void> _loadAttendance() async {
-    setState(() => _loadingAttendance = true);
+    if (mounted) setState(() => _loadingAttendance = true);
+    AttendanceModel? result;
+    String? error;
     try {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final api   = ref.read(apiServiceProvider);
-      final recs  = await api.getMyAttendance(startDate: today, endDate: today);
-      if (mounted) setState(() => _today = recs.isNotEmpty ? recs.first : null);
+      final recs = await ref
+          .read(apiServiceProvider)
+          .getMyAttendance(startDate: today, endDate: today);
+      result = recs.isNotEmpty ? recs.first : null;
     } catch (e) {
-      if (mounted) setState(() => _error = _parseError(e));
-    } finally {
-      if (mounted) setState(() => _loadingAttendance = false);
+      error = _parseError(e);
     }
+    if (mounted)
+      setState(() {
+        _today = result;
+        _loadingAttendance = false;
+        if (error != null) _error = error;
+      });
   }
 
   Future<void> _loadDuty() async {
-    setState(() => _loadingDuty = true);
+    if (mounted) setState(() => _loadingDuty = true);
+    List<DutyAssignment> duties = [];
     try {
-      final duties = await ref.read(apiServiceProvider).getTodayDuties();
-      if (mounted) setState(() => _todayDuties = duties);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingDuty = false);
-    }
+      duties = await ref.read(apiServiceProvider).getTodayDuties();
+    } catch (_) {}
+    if (mounted)
+      setState(() {
+        _todayDuties = duties;
+        _loadingDuty = false;
+      });
   }
 
   Future<void> _loadNews() async {
-    setState(() => _loadingNews = true);
+    if (mounted) setState(() => _loadingNews = true);
+    List<News> news = [];
     try {
-      final news = await ref.read(apiServiceProvider).getNews();
-      if (mounted) setState(() => _news = news.take(3).toList());
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingNews = false);
-    }
+      news = (await ref.read(apiServiceProvider).getNews()).take(3).toList();
+    } catch (_) {}
+    if (mounted)
+      setState(() {
+        _news = news;
+        _loadingNews = false;
+      });
   }
 
   Future<void> _loadSchedule() async {
-    setState(() => _loadingSchedule = true);
+    if (mounted) setState(() => _loadingSchedule = true);
+    List<EmployeeScheduleModel> schedules = [];
     try {
       final uid = ref.read(authProvider).user?.id;
-      if (uid == null) return;
-      final s = await ref.read(apiServiceProvider).getEmployeeSchedules(uid);
-      if (mounted) setState(() => _schedules = s);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingSchedule = false);
-    }
+      if (uid != null)
+        schedules =
+            await ref.read(apiServiceProvider).getEmployeeSchedules(uid);
+    } catch (_) {}
+    if (mounted)
+      setState(() {
+        _schedules = schedules;
+        _loadingSchedule = false;
+      });
   }
 
   Future<void> _onCheckIn() async {
@@ -203,7 +236,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       final rec = await ref.read(apiServiceProvider).checkIn(result);
       if (!mounted) return;
-      setState(() { _today = rec; _actionLoading = false; });
+      setState(() {
+        _today = rec;
+        _actionLoading = false;
+      });
       _showSnack('Приход отмечен! ✓', AppColors.success);
     } catch (e) {
       if (!mounted) return;
@@ -213,13 +249,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _onCheckOut() async {
-    final result = await context.push<String>('/qr-scanner', extra: 'check_out');
+    final result =
+        await context.push<String>('/qr-scanner', extra: 'check_out');
     if (result == null || !mounted) return;
     setState(() => _actionLoading = true);
     try {
       final rec = await ref.read(apiServiceProvider).checkOut(result);
       if (!mounted) return;
-      setState(() { _today = rec; _actionLoading = false; });
+      setState(() {
+        _today = rec;
+        _actionLoading = false;
+      });
       _showSnack('Уход отмечен!', AppColors.primary);
     } catch (e) {
       if (!mounted) return;
@@ -232,7 +272,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final s = e.toString();
     final m = RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(s);
     if (m != null) return m.group(1)!;
-    if (s.contains('SocketException') || s.contains('refused') || s.contains('timed out')) {
+    if (s.contains('SocketException') ||
+        s.contains('refused') ||
+        s.contains('timed out')) {
       return 'Нет подключения к серверу';
     }
     return 'Произошла ошибка';
@@ -241,7 +283,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _showSnack(String msg, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+          style: const TextStyle(
+              fontWeight: FontWeight.w600, fontFamily: 'Inter')),
       backgroundColor: color,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -250,8 +293,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   EmployeeScheduleModel? get _todaySchedule {
     final dow = DateTime.now().weekday - 1;
-    try { return _schedules.firstWhere((s) => s.dayOfWeek == dow); }
-    catch (_) { return null; }
+    try {
+      return _schedules.firstWhere((s) => s.dayOfWeek == dow);
+    } catch (_) {
+      return null;
+    }
   }
 
   bool _isMyDutyToday(String? uid) =>
@@ -260,7 +306,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _liveWorkTime() {
     if (_today?.checkInTime == null) return '';
     final inDt = DateTime.parse(_today!.checkInTime!).toLocal();
-    final diff  = DateTime.now().difference(inDt);
+    final diff = DateTime.now().difference(inDt);
     if (diff.isNegative) return '';
     final h = diff.inHours, m = diff.inMinutes % 60;
     return h > 0 ? '$h ч $m м' : '$m м';
@@ -269,10 +315,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   // ── build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final auth      = ref.watch(authProvider);
-    final user      = auth.user;
-    final now       = DateTime.now();
-    final greeting  = now.hour < 12 ? 'Доброе утро' : now.hour < 17 ? 'Добрый день' : 'Добрый вечер';
+    final auth = ref.watch(authProvider);
+    final user = auth.user;
+    final now = DateTime.now();
+    final greeting = now.hour < 12
+        ? 'Доброе утро'
+        : now.hour < 17
+            ? 'Добрый день'
+            : 'Добрый вечер';
     final firstName = user?.fullName?.split(' ').first ?? 'Сотрудник';
 
     return Scaffold(
@@ -299,10 +349,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   child: _Header(
                     greeting: greeting,
                     firstName: firstName,
-                    avatarUrl: ref.read(apiServiceProvider).mediaAbsoluteUrl(user?.avatarUrl),
+                    avatarUrl: ref
+                        .read(apiServiceProvider)
+                        .mediaAbsoluteUrl(user?.avatarUrl),
                     isAdmin: auth.isAdmin,
                     onAvatar: () => context.push('/home/profile'),
-                    onAdmin:  () => context.push('/home/admin'),
+                    onAdmin: () => context.push('/home/admin'),
                     now: now,
                   ),
                 ),
@@ -316,11 +368,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 child: SlideTransition(
                   position: _cardsSlide,
                   child: _QuickStatsRow(
-                    today: _today,
-                    loading: _loadingAttendance,
+                    loading: _loadingOffice,
+                    inOfficeCount:
+                        (_officeStatus?['in_office'] as List?)?.length ?? 0,
                     dutiesCount: _todayDuties.length,
                     newsCount: _news.length,
-                    onAttendance: () {},
+                    onOffice: () {},
                     onDuty: () => context.go('/duty'),
                     onNews: () => context.go('/news'),
                   ),
@@ -333,15 +386,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-
                   // error banner
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     _AnimatedSection(
-                      fade: _sectionFades[0], slide: _sectionSlides[0],
+                      fade: _sectionFades[0],
+                      slide: _sectionSlides[0],
                       child: _ErrorBanner(
                         message: _error!,
-                        onRetry: () { setState(() => _error = null); _loadAll(); },
+                        onRetry: () {
+                          setState(() => _error = null);
+                          _loadAll();
+                        },
                       ),
                     ),
                   ],
@@ -351,8 +407,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   // duty callout
                   if (_isMyDutyToday(user?.id)) ...[
                     _AnimatedSection(
-                      fade: _sectionFades[0], slide: _sectionSlides[0],
-                      child: _DutyCalloutCard(onOpen: () => context.go('/duty')),
+                      fade: _sectionFades[0],
+                      slide: _sectionSlides[0],
+                      child:
+                          _DutyCalloutCard(onOpen: () => context.go('/duty')),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -360,7 +418,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   // incoming swap requests banner
                   if (_incomingSwaps.isNotEmpty) ...[
                     _AnimatedSection(
-                      fade: _sectionFades[0], slide: _sectionSlides[0],
+                      fade: _sectionFades[0],
+                      slide: _sectionSlides[0],
                       child: _SwapRequestBanner(
                         swaps: _incomingSwaps,
                         onOpen: () async {
@@ -374,7 +433,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                   // attendance
                   _AnimatedSection(
-                    fade: _sectionFades[1], slide: _sectionSlides[1],
+                    fade: _sectionFades[1],
+                    slide: _sectionSlides[1],
                     child: _AttendanceCard(
                       record: _today,
                       loading: _loadingAttendance,
@@ -388,9 +448,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   const SizedBox(height: 14),
 
+                  // office status
+                  _AnimatedSection(
+                    fade: _sectionFades[2],
+                    slide: _sectionSlides[2],
+                    child: _OfficeStatusCard(
+                      data: _officeStatus,
+                      loading: _loadingOffice,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
                   // schedule mini
                   _AnimatedSection(
-                    fade: _sectionFades[2], slide: _sectionSlides[2],
+                    fade: _sectionFades[3],
+                    slide: _sectionSlides[3],
                     child: _ScheduleMini(
                       schedules: _schedules,
                       loading: _loadingSchedule,
@@ -401,7 +473,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                   // duty section
                   _AnimatedSection(
-                    fade: _sectionFades[3], slide: _sectionSlides[3],
+                    fade: _sectionFades[4],
+                    slide: _sectionSlides[4],
                     child: _DutySectionHome(
                       duties: _todayDuties,
                       loading: _loadingDuty,
@@ -413,7 +486,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                   // news mini
                   _AnimatedSection(
-                    fade: _sectionFades[4], slide: _sectionSlides[4],
+                    fade: _sectionFades[5],
+                    slide: _sectionSlides[5],
                     child: _NewsMini(
                       news: _news,
                       loading: _loadingNews,
@@ -459,11 +533,14 @@ class _Header extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF4361EE), Color(0xFF3451D1)],
+          colors: [
+            Color.fromARGB(255, 32, 93, 247),
+            Color.fromARGB(255, 0, 20, 68),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(38)),
       ),
       child: SafeArea(
         bottom: false,
@@ -524,16 +601,21 @@ class _Header extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.4), width: 2),
                       ),
                       child: ClipOval(
                         child: avatarUrl.isNotEmpty
-                            ? Image.network(
-                                avatarUrl,
+                            ? CachedNetworkImage(
+                                imageUrl: avatarUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                memCacheWidth: 84,
+                                memCacheHeight: 84,
+                                errorWidget: (_, __, ___) => Center(
                                   child: Text(
-                                    firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                    firstName.isNotEmpty
+                                        ? firstName[0].toUpperCase()
+                                        : 'U',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w800,
@@ -545,7 +627,9 @@ class _Header extends StatelessWidget {
                               )
                             : Center(
                                 child: Text(
-                                  firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U',
+                                  firstName.isNotEmpty
+                                      ? firstName[0].toUpperCase()
+                                      : 'U',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w800,
@@ -562,7 +646,8 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 20),
               // date chip
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -598,66 +683,63 @@ class _Header extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _QuickStatsRow extends StatelessWidget {
-  final AttendanceModel? today;
   final bool loading;
+  final int inOfficeCount;
   final int dutiesCount;
   final int newsCount;
-  final VoidCallback onAttendance;
+  final VoidCallback onOffice;
   final VoidCallback onDuty;
   final VoidCallback onNews;
 
   const _QuickStatsRow({
-    required this.today,
     required this.loading,
+    required this.inOfficeCount,
     required this.dutiesCount,
     required this.newsCount,
-    required this.onAttendance,
+    required this.onOffice,
     required this.onDuty,
     required this.onNews,
   });
 
   @override
   Widget build(BuildContext context) {
-    final checkIn = today?.formattedCheckIn ?? '--:--';
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
-          children: [
-            Expanded(
-              child: _StatMiniCard(
-                icon: Icons.login_rounded,
-                label: 'Приход',
-                value: loading ? '...' : checkIn,
-                color: _kCard1,
-                onTap: onAttendance,
-              ),
+        children: [
+          Expanded(
+            child: _StatMiniCard(
+              icon: Icons.people_rounded,
+              label: 'В офисе',
+              value: loading ? '...' : '$inOfficeCount',
+              color: const Color.fromARGB(255, 32, 93, 247),
+              onTap: onOffice,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatMiniCard(
-                icon: Icons.cleaning_services_rounded,
-                label: 'Дежурство',
-                value: dutiesCount > 0 ? 'Назначено' : 'Нет',
-                color: _kCard2,
-                onTap: onDuty,
-              ),
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: _StatMiniCard(
+              icon: Icons.cleaning_services_rounded,
+              label: 'Дежурство',
+              value: '$dutiesCount',
+              color: const Color.fromARGB(255, 32, 93, 247),
+              onTap: onDuty,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _StatMiniCard(
-                icon: Icons.article_rounded,
-                label: 'Новости',
-                value: '$newsCount',
-                color: _kCard3,
-                onTap: onNews,
-              ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _StatMiniCard(
+              icon: Icons.article_rounded,
+              label: 'Новости',
+              value: '$newsCount',
+              color: const Color.fromARGB(255, 32, 93, 247),
+              onTap: onNews,
             ),
-          ],
+          ),
+        ],
       ),
     );
   }
-
 }
 
 class _StatMiniCard extends StatefulWidget {
@@ -703,7 +785,10 @@ class _StatMiniCardState extends State<_StatMiniCard>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => _pressCtrl.forward(),
-      onTapUp: (_) { _pressCtrl.reverse(); widget.onTap(); },
+      onTapUp: (_) {
+        _pressCtrl.reverse();
+        widget.onTap();
+      },
       onTapCancel: () => _pressCtrl.reverse(),
       child: ScaleTransition(
         scale: _scale,
@@ -734,6 +819,8 @@ class _StatMiniCardState extends State<_StatMiniCard>
               const SizedBox(height: 10),
               Text(
                 widget.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -745,6 +832,8 @@ class _StatMiniCardState extends State<_StatMiniCard>
               const SizedBox(height: 2),
               Text(
                 widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.75),
                   fontSize: 11,
@@ -1054,9 +1143,11 @@ class _AttendanceCard extends StatelessWidget {
   });
 
   bool get _excused => record?.status.toLowerCase() == 'approved_absence';
-  bool get _canIn   => !_excused && (record == null || record!.checkInTime == null);
-  bool get _canOut  => !_excused && record?.checkInTime != null && record?.checkOutTime == null;
-  bool get _done    => record?.checkOutTime != null;
+  bool get _canIn =>
+      !_excused && (record == null || record!.checkInTime == null);
+  bool get _canOut =>
+      !_excused && record?.checkInTime != null && record?.checkOutTime == null;
+  bool get _done => record?.checkOutTime != null;
 
   @override
   Widget build(BuildContext context) {
@@ -1074,8 +1165,7 @@ class _AttendanceCard extends StatelessWidget {
       ),
       child: loading
           ? Padding(
-              padding: const EdgeInsets.all(20),
-              child: _Shimmer(height: 120))
+              padding: const EdgeInsets.all(20), child: _Shimmer(height: 120))
           : Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -1094,11 +1184,13 @@ class _AttendanceCard extends StatelessWidget {
                             color: AppColors.primary, size: 18),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          'Посещаемость сегодня',
-                          style: TextStyle(
-                            fontSize: 15,
+                          'Посещаемость',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                             fontFamily: 'Inter',
@@ -1153,7 +1245,8 @@ class _AttendanceCard extends StatelessWidget {
                       icon: Icons.logout_rounded,
                       color: AppColors.error,
                     ),
-                    if (liveTime.isNotEmpty || record?.workDuration != null) ...[
+                    if (liveTime.isNotEmpty ||
+                        record?.workDuration != null) ...[
                       const SizedBox(width: 10),
                       _TimeBox(
                         label: _done ? 'Итого' : 'Сейчас',
@@ -1199,14 +1292,16 @@ class _AttendanceCard extends StatelessWidget {
                       color: AppColors.primary,
                       bg: AppColors.primaryLight,
                       icon: Icons.info_outline_rounded,
-                      text: 'Для администраторов учёт посещаемости ведётся через панель администратора.',
+                      text:
+                          'Для администраторов учёт посещаемости ведётся через панель администратора.',
                     )
                   else if (_excused)
                     _InfoBox(
                       color: AppColors.success,
                       bg: AppColors.successLight,
                       icon: Icons.verified_user_rounded,
-                      text: 'Сегодня у вас утверждённое отсутствие. Отметки не нужны.',
+                      text:
+                          'Сегодня у вас утверждённое отсутствие. Отметки не нужны.',
                     )
                   else if (actionLoading)
                     const Center(
@@ -1236,8 +1331,10 @@ class _InfoBox extends StatelessWidget {
   final String text;
 
   const _InfoBox({
-    required this.color, required this.bg,
-    required this.icon, required this.text,
+    required this.color,
+    required this.bg,
+    required this.icon,
+    required this.text,
   });
 
   @override
@@ -1258,8 +1355,11 @@ class _InfoBox extends StatelessWidget {
           Expanded(
             child: Text(text,
                 style: TextStyle(
-                    fontSize: 13, color: color, fontFamily: 'Inter',
-                    fontWeight: FontWeight.w500, height: 1.4)),
+                    fontSize: 13,
+                    color: color,
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w500,
+                    height: 1.4)),
           ),
         ],
       ),
@@ -1273,8 +1373,10 @@ class _TimeBox extends StatelessWidget {
   final Color color;
 
   const _TimeBox({
-    required this.label, required this.value,
-    required this.icon, required this.color,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
   });
 
   @override
@@ -1325,7 +1427,8 @@ class _ActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Expanded(child: _PressButton(
+      Expanded(
+          child: _PressButton(
         label: 'Приход',
         icon: Icons.login_rounded,
         color: AppColors.success,
@@ -1333,7 +1436,8 @@ class _ActionButtons extends StatelessWidget {
         onTap: onCheckIn,
       )),
       const SizedBox(width: 10),
-      Expanded(child: _PressButton(
+      Expanded(
+          child: _PressButton(
         label: 'Уход',
         icon: Icons.logout_rounded,
         color: AppColors.error,
@@ -1352,8 +1456,10 @@ class _PressButton extends StatefulWidget {
   final VoidCallback onTap;
 
   const _PressButton({
-    required this.label, required this.icon,
-    required this.color, required this.enabled,
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.enabled,
     required this.onTap,
   });
 
@@ -1369,20 +1475,29 @@ class _PressButtonState extends State<_PressButton>
   @override
   void initState() {
     super.initState();
-    _ctrl  = AnimationController(vsync: this, duration: const Duration(milliseconds: 100));
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 100));
     _scale = Tween<double>(begin: 1.0, end: 0.95)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final active = widget.enabled;
     return GestureDetector(
-      onTapDown:  (_) { if (active) _ctrl.forward(); },
-      onTapUp:    (_) { _ctrl.reverse(); if (active) widget.onTap(); },
+      onTapDown: (_) {
+        if (active) _ctrl.forward();
+      },
+      onTapUp: (_) {
+        _ctrl.reverse();
+        if (active) widget.onTap();
+      },
       onTapCancel: () => _ctrl.reverse(),
       child: ScaleTransition(
         scale: _scale,
@@ -1393,9 +1508,12 @@ class _PressButtonState extends State<_PressButton>
             color: active ? widget.color : widget.color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(14),
             boxShadow: active
-                ? [BoxShadow(
-                    color: widget.color.withOpacity(0.35),
-                    blurRadius: 12, offset: const Offset(0, 4))]
+                ? [
+                    BoxShadow(
+                        color: widget.color.withOpacity(0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4))
+                  ]
                 : [],
           ),
           child: Row(
@@ -1407,7 +1525,9 @@ class _PressButtonState extends State<_PressButton>
               const SizedBox(width: 8),
               Text(widget.label,
                   style: TextStyle(
-                      color: active ? Colors.white : widget.color.withOpacity(0.35),
+                      color: active
+                          ? Colors.white
+                          : widget.color.withOpacity(0.35),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                       fontFamily: 'Inter')),
@@ -1430,8 +1550,10 @@ class _DutySectionHome extends StatelessWidget {
   final VoidCallback onOpen;
 
   const _DutySectionHome({
-    required this.duties, required this.loading,
-    required this.currentUserId, required this.onOpen,
+    required this.duties,
+    required this.loading,
+    required this.currentUserId,
+    required this.onOpen,
   });
 
   @override
@@ -1444,19 +1566,28 @@ class _DutySectionHome extends StatelessWidget {
       return _CardShell(
         onTap: onOpen,
         child: Row(children: [
-          _IconBox(color: AppColors.primary, icon: Icons.cleaning_services_rounded),
+          _IconBox(
+              color: AppColors.primary, icon: Icons.cleaning_services_rounded),
           const SizedBox(width: 14),
           const Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Дежурство сегодня',
-                  style: TextStyle(fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter')),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textHint,
+                      fontFamily: 'Inter')),
               SizedBox(height: 3),
               Text('Дежурного нет',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter')),
             ]),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textHint, size: 18),
         ]),
       );
     }
@@ -1479,7 +1610,8 @@ class _DutyCard extends StatelessWidget {
   final bool isMyDuty;
   final VoidCallback onOpen;
 
-  const _DutyCard({required this.duty, required this.isMyDuty, required this.onOpen});
+  const _DutyCard(
+      {required this.duty, required this.isMyDuty, required this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -1500,31 +1632,41 @@ class _DutyCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
-              blurRadius: 12, offset: const Offset(0, 3),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Row(children: [
-          _IconBox(color: accent, icon: isLunch
-              ? Icons.lunch_dining_rounded
-              : Icons.cleaning_services_rounded),
+          _IconBox(
+              color: accent,
+              icon: isLunch
+                  ? Icons.lunch_dining_rounded
+                  : Icons.cleaning_services_rounded),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${duty.typeEmoji} ${duty.typeLabel} сегодня',
                   style: const TextStyle(
-                      fontSize: 11, color: AppColors.textHint, fontFamily: 'Inter')),
+                      fontSize: 11,
+                      color: AppColors.textHint,
+                      fontFamily: 'Inter')),
               const SizedBox(height: 4),
               Text(
-                isMyDuty ? 'Сегодня дежуришь ты!' : (duty.userFullName ?? 'Сотрудник'),
+                isMyDuty
+                    ? 'Сегодня дежуришь ты!'
+                    : (duty.userFullName ?? 'Сотрудник'),
                 style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                     color: isMyDuty ? _kOrange : AppColors.textPrimary,
                     fontFamily: 'Inter'),
               ),
             ]),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 18),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textHint, size: 18),
         ]),
       ),
     );
@@ -1541,15 +1683,20 @@ class _ScheduleMini extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ScheduleMini({
-    required this.schedules, required this.loading, required this.onTap,
+    required this.schedules,
+    required this.loading,
+    required this.onTap,
   });
 
   static const _days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   int get _todayDow => DateTime.now().weekday - 1;
 
   EmployeeScheduleModel? _scheduleFor(int dow) {
-    try { return schedules.firstWhere((s) => s.dayOfWeek == dow); }
-    catch (_) { return null; }
+    try {
+      return schedules.firstWhere((s) => s.dayOfWeek == dow);
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -1564,7 +1711,8 @@ class _ScheduleMini extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: const Offset(0, 4),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1572,16 +1720,24 @@ class _ScheduleMini extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              _IconBox(color: const Color(0xFF7B61FF), icon: Icons.calendar_month_rounded),
+              _IconBox(
+                  color: const Color(0xFF7B61FF),
+                  icon: Icons.calendar_month_rounded),
               const SizedBox(width: 12),
               const Text('Мой график',
                   style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter')),
               const Spacer(),
               const Text('Подробнее',
-                  style: TextStyle(fontSize: 12, color: AppColors.primary, fontFamily: 'Inter')),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontFamily: 'Inter')),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.primary, size: 16),
             ]),
             const SizedBox(height: 16),
             if (loading)
@@ -1590,8 +1746,8 @@ class _ScheduleMini extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(7, (dow) {
-                  final isToday  = dow == _todayDow;
-                  final s        = _scheduleFor(dow);
+                  final isToday = dow == _todayDow;
+                  final s = _scheduleFor(dow);
                   final isWorking = s?.isWorkingDay ?? false;
 
                   return Column(children: [
@@ -1607,9 +1763,12 @@ class _ScheduleMini extends StatelessWidget {
                                 : const Color(0xFFF3F4F6),
                         shape: BoxShape.circle,
                         boxShadow: isToday
-                            ? [BoxShadow(
-                                color: _kCard1.withOpacity(0.4),
-                                blurRadius: 10, offset: const Offset(0, 3))]
+                            ? [
+                                BoxShadow(
+                                    color: _kCard1.withOpacity(0.4),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3))
+                              ]
                             : [],
                       ),
                       child: Center(
@@ -1633,7 +1792,9 @@ class _ScheduleMini extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 9,
                           fontFamily: 'Inter',
-                          color: isWorking ? AppColors.textSecondary : AppColors.textHint),
+                          color: isWorking
+                              ? AppColors.textSecondary
+                              : AppColors.textHint),
                     ),
                   ]);
                 }),
@@ -1656,8 +1817,10 @@ class _NewsMini extends StatelessWidget {
   final void Function(String) onItem;
 
   const _NewsMini({
-    required this.news, required this.loading,
-    required this.onAll, required this.onItem,
+    required this.news,
+    required this.loading,
+    required this.onAll,
+    required this.onItem,
   });
 
   @override
@@ -1669,7 +1832,8 @@ class _NewsMini extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 16, offset: const Offset(0, 4),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1682,16 +1846,21 @@ class _NewsMini extends StatelessWidget {
               const SizedBox(width: 12),
               const Text('Новости',
                   style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary, fontFamily: 'Inter')),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter')),
               const Spacer(),
               GestureDetector(
                 onTap: onAll,
                 child: const Row(children: [
                   Text('Все',
                       style: TextStyle(
-                          fontSize: 12, color: AppColors.primary, fontFamily: 'Inter')),
-                  Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+                          fontSize: 12,
+                          color: AppColors.primary,
+                          fontFamily: 'Inter')),
+                  Icon(Icons.chevron_right_rounded,
+                      color: AppColors.primary, size: 16),
                 ]),
               ),
             ]),
@@ -1706,7 +1875,8 @@ class _NewsMini extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Center(
                 child: Text('Нет новостей',
-                    style: TextStyle(color: AppColors.textHint, fontFamily: 'Inter')),
+                    style: TextStyle(
+                        color: AppColors.textHint, fontFamily: 'Inter')),
               ),
             )
           else
@@ -1716,8 +1886,11 @@ class _NewsMini extends StatelessWidget {
                 children: [
                   _NewsItem(news: e.value, onTap: () => onItem(e.value.id)),
                   if (!isLast)
-                    const Divider(height: 1, color: AppColors.divider,
-                        indent: 20, endIndent: 20),
+                    const Divider(
+                        height: 1,
+                        color: AppColors.divider,
+                        indent: 20,
+                        endIndent: 20),
                 ],
               );
             }),
@@ -1753,7 +1926,8 @@ class _NewsItem extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.article_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.article_rounded,
+                  color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1815,7 +1989,8 @@ class _CardShell extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
-              blurRadius: 14, offset: const Offset(0, 3),
+              blurRadius: 14,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -1860,6 +2035,265 @@ class _Shimmer extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OFFICE STATUS CARD
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _OfficeStatusCard extends StatefulWidget {
+  final Map<String, dynamic>? data;
+  final bool loading;
+
+  const _OfficeStatusCard({required this.data, required this.loading});
+
+  @override
+  State<_OfficeStatusCard> createState() => _OfficeStatusCardState();
+}
+
+class _OfficeStatusCardState extends State<_OfficeStatusCard> {
+  int _tab = 0; // 0=в офисе, 1=ушли, 2=не пришли
+
+  @override
+  Widget build(BuildContext context) {
+    final inOffice =
+        (widget.data?['in_office'] as List?)?.cast<Map<String, dynamic>>() ??
+            [];
+    final left =
+        (widget.data?['left'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final notArrived =
+        (widget.data?['not_arrived'] as List?)?.cast<Map<String, dynamic>>() ??
+            [];
+    final total = widget.data?['total'] as int? ?? 0;
+
+    final tabs = [
+      (
+        label: 'В офисе',
+        count: inOffice.length,
+        color: AppColors.success,
+        icon: Icons.business_rounded
+      ),
+      (
+        label: 'Ушли',
+        count: left.length,
+        color: AppColors.primary,
+        icon: Icons.logout_rounded
+      ),
+      (
+        label: 'Нет',
+        count: notArrived.length,
+        color: AppColors.error,
+        icon: Icons.person_off_rounded
+      ),
+    ];
+
+    final currentList = [inOffice, left, notArrived][_tab];
+    final currentColor = tabs[_tab].color;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Row(children: [
+              _IconBox(
+                  color: const Color(0xFF06D6A0), icon: Icons.groups_rounded),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Сотрудники сегодня',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'Inter')),
+                      if (total > 0)
+                        Text('Всего $total сотрудников',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textHint,
+                                fontFamily: 'Inter')),
+                    ]),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Tab buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+                children: tabs.asMap().entries.map((e) {
+              final i = e.key;
+              final t = e.value;
+              final active = _tab == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _tab = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: EdgeInsets.only(right: i < tabs.length - 1 ? 8 : 0),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? t.color.withOpacity(0.12)
+                          : AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: active
+                            ? t.color.withOpacity(0.4)
+                            : AppColors.border,
+                        width: active ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(children: [
+                      Text('${t.count}',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: active ? t.color : AppColors.textHint,
+                              fontFamily: 'Inter')),
+                      const SizedBox(height: 2),
+                      Text(t.label,
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: active ? t.color : AppColors.textHint,
+                              fontFamily: 'Inter')),
+                    ]),
+                  ),
+                ),
+              );
+            }).toList()),
+          ),
+
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.divider),
+
+          // List
+          widget.loading
+              ? const Padding(
+                  padding: EdgeInsets.all(20), child: _Shimmer(height: 80))
+              : currentList.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: Text('Нет данных',
+                            style: const TextStyle(
+                                color: AppColors.textHint,
+                                fontSize: 13,
+                                fontFamily: 'Inter')),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount:
+                          currentList.length > 8 ? 8 : currentList.length,
+                      separatorBuilder: (_, __) => const Divider(
+                          height: 1,
+                          color: AppColors.divider,
+                          indent: 56,
+                          endIndent: 16),
+                      itemBuilder: (_, i) {
+                        final person = currentList[i];
+                        final name = person['name'] as String? ?? '—';
+                        final checkIn = person['check_in_time'] as String?;
+                        final checkOut = person['check_out_time'] as String?;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          child: Row(children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: currentColor.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: currentColor,
+                                      fontFamily: 'Inter'),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(name,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                      fontFamily: 'Inter'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            if (checkIn != null)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                Icon(Icons.login_rounded,
+                                    size: 12, color: AppColors.success),
+                                const SizedBox(width: 3),
+                                Text(checkIn,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.success,
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.w600)),
+                                if (checkOut != null) ...[
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.logout_rounded,
+                                      size: 12, color: AppColors.textHint),
+                                  const SizedBox(width: 3),
+                                  Text(checkOut,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textHint,
+                                          fontFamily: 'Inter')),
+                                ],
+                              ]),
+                          ]),
+                        );
+                      },
+                    ),
+
+          if (!widget.loading && currentList.length > 8)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                '+ ещё ${currentList.length - 8} чел.',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textHint,
+                    fontFamily: 'Inter'),
+              ),
+            )
+          else
+            const SizedBox(height: 8),
+        ],
       ),
     );
   }

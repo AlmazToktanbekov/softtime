@@ -369,9 +369,9 @@ async function loadDashboard() {
     latest.innerHTML = detail.map(r => `
       <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border)">
         <div>
-          <div style="font-weight:700; font-size:14px">${r.full_name}</div>
+          <div style="font-weight:700; font-size:14px">${r.employee_name || r.full_name || '—'}</div>
           <div style="font-size:12px; color:var(--text-sub)">
-            ${r.team_name || '—'} • ${r.check_in_time || '—'} → ${r.check_out_time || '—'}
+            ${r.team_name || '—'} • ${r.check_in_time ? r.check_in_time + ' →' : '—'} ${r.check_out_time || ''}
           </div>
         </div>
         ${statusBadge(r.status)}
@@ -405,12 +405,19 @@ function renderEmployees(list) {
 
   const roleLabels = { SUPER_ADMIN:'Супер Админ', ADMIN:'Админ', TEAM_LEAD:'Тимлид', EMPLOYEE:'Сотрудник', INTERN:'Стажёр' };
   const statusLabels = { ACTIVE:'Активен', BLOCKED:'Заблокирован', LEAVE:'В отпуске', WARNING:'Предупреждение', DELETED:'Удалён' };
-  tbody.innerHTML = list.map(e => `
+  const mediaBase = API.replace(/\/api\/v1\/?$/, '');
+  tbody.innerHTML = list.map(e => {
+    const avatarUrl = e.avatar_url ? (e.avatar_url.startsWith('http') ? e.avatar_url : `${mediaBase}${e.avatar_url}`) : null;
+    const avatarHtml = avatarUrl
+      ? `<img src="${avatarUrl}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '';
+    const initialHtml = `<div style="width:36px;height:36px;background:rgba(26,115,232,0.1);border-radius:10px;display:${avatarUrl ? 'none' : 'flex'};align-items:center;justify-content:center;font-weight:800;color:var(--primary)">${(e.full_name || '?')[0].toUpperCase()}</div>`;
+    return `
     <tr>
       <td>
         <div style="display:flex; align-items:center; gap:12px">
-          <div style="width:36px;height:36px;background:rgba(26,115,232,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--primary)">
-            ${(e.full_name || '?')[0].toUpperCase()}
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0">
+            ${avatarHtml}${initialHtml}
           </div>
           <div>
             <div style="font-weight:700">${e.full_name || '—'}</div>
@@ -434,7 +441,8 @@ function renderEmployees(list) {
         <button class="btn btn-danger btn-sm" onclick="deleteEmployee('${e.id}')">Удалить</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 
@@ -648,7 +656,7 @@ function renderAttendance(list) {
   const tbody = document.getElementById('attendanceTable');
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:32px">Нет записей</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:32px">Нет записей</td></tr>';
     return;
   }
 
@@ -657,7 +665,6 @@ function renderAttendance(list) {
       <td style="font-weight:700">${r.date || '—'}</td>
       <td>
         <div style="font-weight:700">${r.employee_name || '—'}</div>
-        <div style="font-size:12px; color:var(--text-sub)">ID: ${r.user_id}</div>
       </td>
       <td style="color:var(--accent); font-weight:700">${r.formatted_check_in || '—'}</td>
       <td style="color:var(--error); font-weight:700">${r.formatted_check_out || '—'}</td>
@@ -735,10 +742,8 @@ function renderRequests(list) {
     const isResolved = ['approved', 'rejected', 'needs_clarification'].includes(r.status);
     return `
       <tr>
-        <td style="font-weight:700">#${r.id}</td>
         <td>
           <div style="font-weight:700">${r.user_full_name || '—'}</div>
-          <div style="font-size:12px; color:var(--text-sub)">${r.user_id ? String(r.user_id).slice(0,8) + '…' : ''}</div>
         </td>
         <td>${typeLabel}</td>
         <td>${period}${r.start_time ? `<div style="font-size:12px;color:var(--text-sub)">в ${String(r.start_time).slice(0,5)}</div>` : ''}</td>
@@ -1133,12 +1138,12 @@ async function loadPeriodReport() {
               ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">Нет данных</td></tr>'
               : data.employees.map(e => `
                 <tr>
-                  <td style="font-weight:700">${e.full_name}</td>
+                  <td style="font-weight:700">${e.full_name || '—'}</td>
                   <td>${e.team_name||'—'}</td>
                   <td style="color:var(--accent);font-weight:700">${e.days_present}</td>
                   <td style="color:var(--primary);font-weight:700">${_fmtHours(e.total_work_minutes)}</td>
                   <td>${e.days_late > 0 ? `<span style="color:var(--warning)">${e.days_late}</span>` : '—'}</td>
-                  <td>${e.total_late_minutes > 0 ? `<span style="color:var(--warning)">${e.total_late_minutes} мин</span>` : '—'}</td>
+                  <td>${e.total_late_minutes > 0 ? `<span style="color:var(--warning)">${_fmtHours(e.total_late_minutes)}</span>` : '—'}</td>
                   <td>${e.days_absent > 0 ? `<span style="color:var(--error)">${e.days_absent}</span>` : '—'}</td>
                   <td>${e.days_approved_absence > 0 ? `<span style="color:var(--primary)">${e.days_approved_absence}</span>` : '—'}</td>
                 </tr>`).join('')}
@@ -1711,16 +1716,19 @@ async function saveAllSchedule(userId) {
 // =========== HELPERS ===========
 function statusBadge(s) {
   const map = {
-    present: ['badge-present', '✅ В офисе'],
-    late: ['badge-late', '⚠️ Опоздание'],
-    absent: ['badge-absent', '❌ Не пришёл'],
-    incomplete: ['badge-incomplete', '🕒 Не завершил день'],
-    completed: ['badge-completed', '✔️ Завершён'],
-    manual: ['badge-manual', '✏️ Вручную'],
-    approved_absence: ['badge-approved-absence', '✓ Разрешённое отсутствие'],
+    present:          ['badge-present',           '✅ В офисе'],
+    late:             ['badge-late',              '⚠️ Опоздание'],
+    absent:           ['badge-absent',            '❌ Не пришёл'],
+    incomplete:       ['badge-incomplete',        '🕒 Не завершил день'],
+    completed:        ['badge-completed',         '✔️ Завершён'],
+    manual:           ['badge-manual',            '✏️ Вручную'],
+    approved_absence: ['badge-approved-absence',  '✓ Разреш. отсутствие'],
+    early_leave:      ['badge-early-leave',       '🏃 Ранний уход'],
+    overtime:         ['badge-overtime',          '⏰ Сверхурочно'],
   };
 
-  const [cls, lbl] = map[s?.toLowerCase()] || ['badge-absent', s];
+  if (!s) return '<span class="badge badge-absent">—</span>';
+  const [cls, lbl] = map[s.toLowerCase()] || ['badge-manual', s];
   return `<span class="badge ${cls}">${lbl}</span>`;
 }
 

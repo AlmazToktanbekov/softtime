@@ -19,6 +19,7 @@ class ApiService {
   static const String _baseUrlStorageKey = 'api_base_url';
   late String _baseUrl = AppConfig.baseUrl;
   Dio? _dio;
+  bool _refreshing = false;
 
   Future<void> init() async {
     final saved = await _storage.read(key: _baseUrlStorageKey);
@@ -106,10 +107,18 @@ class ApiService {
   }
 
   Future<bool> _refreshToken() async {
+    if (_refreshing) return false;
+    _refreshing = true;
     try {
       final refreshToken = await _storage.read(key: 'refresh_token');
-      if (refreshToken == null) return false;
-      final response = await Dio().post(
+      if (refreshToken == null) {
+        await _clearTokens();
+        return false;
+      }
+      final response = await Dio(BaseOptions(
+        connectTimeout: const Duration(milliseconds: AppConfig.connectTimeout),
+        receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeout),
+      )).post(
         '$_baseUrl/auth/refresh',
         data: {'refresh_token': refreshToken},
       );
@@ -117,9 +126,16 @@ class ApiService {
       await _storage.write(key: 'refresh_token', value: response.data['refresh_token']);
       return true;
     } catch (_) {
-      await logout();
+      await _clearTokens();
       return false;
+    } finally {
+      _refreshing = false;
     }
+  }
+
+  Future<void> _clearTokens() async {
+    await _storage.delete(key: 'access_token');
+    await _storage.delete(key: 'refresh_token');
   }
 
   // AUTH
@@ -137,7 +153,10 @@ class ApiService {
   /// окончательное подтверждение делает администратор.
   /// Список менторов для регистрации стажёра (без токена).
   Future<List<Map<String, dynamic>>> fetchRegisterMentors() async {
-    final r = await Dio().get('$_baseUrl/auth/register/mentors');
+    final r = await Dio(BaseOptions(
+      connectTimeout: const Duration(milliseconds: AppConfig.connectTimeout),
+      receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeout),
+    )).get('$_baseUrl/auth/register/mentors');
     return List<Map<String, dynamic>>.from(r.data as List);
   }
 
@@ -168,13 +187,17 @@ class ApiService {
   }
 
   Future<void> logout() async {
+    final refreshToken = await _storage.read(key: 'refresh_token');
+    await _storage.deleteAll();
+    _refreshing = false;
     try {
-      final refreshToken = await _storage.read(key: 'refresh_token');
       if (refreshToken != null) {
-        await dio.post('/auth/logout', data: {'refresh_token': refreshToken});
+        await Dio(BaseOptions(
+          connectTimeout: const Duration(milliseconds: AppConfig.connectTimeout),
+          receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeout),
+        )).post('$_baseUrl/auth/logout', data: {'refresh_token': refreshToken});
       }
     } catch (_) {}
-    await _storage.deleteAll();
   }
 
   Future<bool> isLoggedIn() async {
@@ -653,6 +676,24 @@ class ApiService {
     return response.data['avatar_url'] as String;
   }
 
+  /// Upload avatar using a one-time token (e.g. upload_token from /register).
+  Future<String> uploadAvatarWithToken(File imageFile, String token) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        imageFile.path,
+        filename: imageFile.path.split('/').last,
+      ),
+    });
+    final d = Dio(BaseOptions(
+      baseUrl: _baseUrl,
+      connectTimeout: const Duration(milliseconds: AppConfig.connectTimeout),
+      receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeout),
+      headers: {'Authorization': 'Bearer $token'},
+    ));
+    final response = await d.patch('/users/me/avatar', data: formData);
+    return response.data['avatar_url'] as String;
+  }
+
   // EMPLOYEE SCHEDULES — ADMIN
   Future<void> saveScheduleDay({
     required String userId,
@@ -720,5 +761,10 @@ class ApiService {
       if (commentAdmin != null && commentAdmin.isNotEmpty) 'comment_admin': commentAdmin,
     });
     return AbsenceRequestModel.fromJson(response.data);
+  }
+
+  Future<Map<String, dynamic>> getTodayOfficeStatus() async {
+    final response = await dio.get('/attendance/today-status');
+    return response.data as Map<String, dynamic>;
   }
 }

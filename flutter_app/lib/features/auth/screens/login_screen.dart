@@ -30,7 +30,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         vsync: this, duration: const Duration(milliseconds: 700));
     _fade = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slide = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+        .animate(
+            CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
   }
 
@@ -60,15 +61,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         title: const Text('Адрес сервера'),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(
-              hintText: 'http://192.168.1.1:8000'),
+          decoration:
+              const InputDecoration(hintText: 'http://192.168.1.1:8000'),
           keyboardType: TextInputType.url,
           autocorrect: false,
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, ctrl.text),
               child: const Text('Сохранить')),
@@ -88,54 +88,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final size = MediaQuery.sizeOf(context);
 
     return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Верхняя часть — брендинг ─────────────────────────────────
-            SizedBox(
-              height: size.height * 0.38,
-              child: Center(
-                child: FadeTransition(
-                  opacity: _fade,
+      backgroundColor: const Color(0xFF0D1B3E),
+      resizeToAvoidBottomInset: true,
+      body: Column(
+        children: [
+          // ── Тёмная шапка ─────────────────────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0D1B3E), Color(0xFF0D1B3E)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: FadeTransition(
+                opacity: _fade,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 80,
                         height: 80,
-                        decoration: const BoxDecoration(
-                          color: Color(0x26FFFFFF),
-                          borderRadius:
-                              BorderRadius.all(Radius.circular(22)),
-                        ),
-                        child: const Icon(
-                          Icons.play_circle_filled_rounded,
-                          size: 48,
+                        decoration: BoxDecoration(
                           color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset('assets/images/logo.png',
+                              fit: BoxFit.contain),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       const Text(
                         'SoftTime',
                         style: TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 30,
+                          fontSize: 26,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       const Text(
                         'Система управления офисом',
                         style: TextStyle(
                           fontFamily: 'Inter',
-                          fontSize: 13,
-                          color: Color(0xB3FFFFFF),
+                          fontSize: 12,
+                          color: Color(0xCCFFFFFF),
                         ),
                       ),
                     ],
@@ -143,144 +156,143 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 ),
               ),
             ),
+          ),
 
-            // ── Нижняя часть — форма ─────────────────────────────────────
-            Expanded(
-              child: SlideTransition(
-                position: _slide,
-                child: FadeTransition(
-                  opacity: _fade,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(28)),
-                    ),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Добро пожаловать',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
+          // ── Белая карточка ───────────────────────────────────────────
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(57)),
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+                child: SlideTransition(
+                  position: _slide,
+                  child: FadeTransition(
+                    opacity: _fade,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Добро пожаловать',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Color.fromARGB(255, 29, 29, 87),
                             ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Войдите в свой аккаунт',
-                              style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Войдите в свой аккаунт',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              color: Color(0xFF8A8A9A),
                             ),
-                            const SizedBox(height: 28),
-
-                            // Ошибка
-                            if (auth.error != null) ...[
-                              _ErrorBanner(message: auth.error!),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Поля
-                            _Field(
-                              controller: _usernameCtrl,
-                              label: 'Логин или Email',
-                              icon: Icons.person_outline_rounded,
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Введите логин' : null,
-                            ),
-                            const SizedBox(height: 14),
-                            _Field(
-                              controller: _passwordCtrl,
-                              label: 'Пароль',
-                              icon: Icons.lock_outline_rounded,
-                              obscure: _obscure,
-                              suffix: IconButton(
-                                icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 20,
-                                  color: AppColors.textHint,
-                                ),
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                              ),
-                              validator: (v) =>
-                                  v!.isEmpty ? 'Введите пароль' : null,
-                              onSubmitted: (_) => _login(),
-                            ),
-                            const SizedBox(height: 28),
-
-                            // Кнопка войти
-                            SizedBox(
-                              width: double.infinity,
-                              height: 52,
-                              child: ElevatedButton(
-                                onPressed: auth.isLoading ? null : _login,
-                                child: auth.isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Text('Войти'),
-                              ),
-                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          if (auth.error != null) ...[
+                            _ErrorBanner(message: auth.error!),
                             const SizedBox(height: 16),
-
-                            // Регистрация
-                            Center(
-                              child: TextButton(
-                                onPressed: () => context.push('/register'),
-                                child: const Text(
-                                  'Нет аккаунта? Зарегистрируйтесь',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 14,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                          ],
+                          _Field(
+                            controller: _usernameCtrl,
+                            label: 'Логин или Email',
+                            icon: Icons.person_outline_rounded,
+                            validator: (v) =>
+                                v!.isEmpty ? 'Введите логин' : null,
+                          ),
+                          const SizedBox(height: 14),
+                          _Field(
+                            controller: _passwordCtrl,
+                            label: 'Пароль',
+                            icon: Icons.lock_outline_rounded,
+                            obscure: _obscure,
+                            suffix: IconButton(
+                              icon: Icon(
+                                _obscure
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 20,
+                                color: const Color(0xFF8A8A9A),
+                              ),
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
+                            ),
+                            validator: (v) =>
+                                v!.isEmpty ? 'Введите пароль' : null,
+                            onSubmitted: (_) => _login(),
+                          ),
+                          const SizedBox(height: 28),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    const Color.fromARGB(255, 17, 36, 83),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: auth.isLoading ? null : _login,
+                              child: auth.isLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white))
+                                  : const Text('Войти',
+                                      style: TextStyle(
+                                          fontFamily: 'Inter',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Center(
+                            child: TextButton(
+                              onPressed: () => context.push('/register'),
+                              child: const Text(
+                                'Нет аккаунта? Зарегистрируйтесь',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  color: Color.fromARGB(255, 6, 58, 125),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-
-                            // Сервер
-                            Center(
-                              child: TextButton(
-                                onPressed: _editServer,
-                                child: Text(
-                                  'Сервер: ${ApiService().baseUrl}',
-                                  style: const TextStyle(
+                          ),
+                          Center(
+                            child: TextButton(
+                              onPressed: _editServer,
+                              child: Text(
+                                'Сервер: ${ApiService().baseUrl}',
+                                style: const TextStyle(
                                     fontFamily: 'Inter',
                                     fontSize: 11,
-                                    color: AppColors.textHint,
-                                  ),
-                                ),
+                                    color: Color(0xFFBBBBCC)),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -349,10 +361,7 @@ class _Field extends StatelessWidget {
       validator: validator,
       onFieldSubmitted: onSubmitted,
       style: const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 15,
-        color: AppColors.textPrimary,
-      ),
+          fontFamily: 'Inter', fontSize: 15, color: Color(0xFF1A1A2E)),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),

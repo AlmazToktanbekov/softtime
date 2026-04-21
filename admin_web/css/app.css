@@ -72,6 +72,14 @@ body {
 }
 
 
+.sidebar-logo-img {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+}
+
 .sidebar-logo-text h1 {
   font-size: 15px; font-weight: 800;
   color: var(--text-main); line-height: 1.2;
@@ -446,8 +454,10 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-completed  { background: rgba(67,97,238,.12);  color: var(--primary); }
 .badge-manual   { background: rgba(176,184,201,.15); color: var(--text-sub); }
 .badge-approved-absence { background: rgba(67,97,238,.1); color: var(--primary); }
-.badge-active   { background: rgba(6,214,160,.12);  color: #06D6A0; }
-.badge-inactive { background: rgba(239,35,60,.12);  color: var(--error); }
+.badge-active      { background: rgba(6,214,160,.12);  color: #06D6A0; }
+.badge-inactive    { background: rgba(239,35,60,.12);  color: var(--error); }
+.badge-early-leave { background: rgba(239,35,60,.10);  color: #c0392b; }
+.badge-overtime    { background: rgba(67,97,238,.10);  color: var(--primary); }
 .badge-pending  { background: rgba(255,183,3,.14);  color: #c98a00; }
 .badge-leave    { background: rgba(67,97,238,.12);  color: var(--primary); }
 
@@ -597,20 +607,40 @@ tbody tr:last-child td { border-bottom: none; }
   width: 400px;
   backdrop-filter: blur(20px);
   box-shadow: 0 24px 64px rgba(0,0,0,.35);
+  animation: loginCardIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+@keyframes loginCardIn {
+  from { opacity: 0; transform: translateY(28px) scale(.97); box-shadow: none; }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(67,97,238,.45), 0 0 0 0 rgba(67,97,238,.25); }
+  50%       { box-shadow: 0 12px 48px rgba(67,97,238,.7), 0 0 0 10px rgba(67,97,238,0); }
 }
 
 .login-logo {
-  width: 54px; height: 54px;
-  background: var(--primary);
-  border-radius: 16px;
+  width: 72px; height: 72px;
+  border-radius: 18px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 24px rgba(67,97,238,.5);
+  margin: 0 auto 20px;
+  overflow: hidden;
+  background: #fff;
+  animation: logoPulse 2.8s ease-in-out infinite;
 }
 
-.login-title { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; }
-.login-sub { font-size: 13px; color: rgba(255,255,255,.4); margin-bottom: 32px; font-weight: 500; }
+.login-title {
+  font-size: 26px; font-weight: 800; color: #fff;
+  margin-bottom: 6px;
+  text-align: center;
+  text-shadow: 0 2px 16px rgba(67,97,238,.4);
+}
+.login-sub {
+  font-size: 13px; color: rgba(255,255,255,.4);
+  margin-bottom: 32px; font-weight: 500;
+  text-align: center;
+}
 
 .login-field {
   width: 100%;
