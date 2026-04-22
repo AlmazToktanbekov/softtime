@@ -20,9 +20,16 @@ class ApiService {
   late String _baseUrl = AppConfig.baseUrl;
   Dio? _dio;
   bool _refreshing = false;
+  String? _cachedAccessToken;
 
   Future<void> init() async {
-    final saved = await _storage.read(key: _baseUrlStorageKey);
+    final results = await Future.wait([
+      _storage.read(key: _baseUrlStorageKey),
+      _storage.read(key: 'access_token'),
+    ]);
+    final saved = results[0];
+    _cachedAccessToken = results[1];
+
     final isLocalhost = saved != null &&
         (saved.contains('127.0.0.1') ||
             saved.contains('localhost') ||
@@ -81,7 +88,7 @@ class ApiService {
     d.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.read(key: 'access_token');
+          final token = _cachedAccessToken ?? await _storage.read(key: 'access_token');
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
@@ -122,8 +129,12 @@ class ApiService {
         '$_baseUrl/auth/refresh',
         data: {'refresh_token': refreshToken},
       );
-      await _storage.write(key: 'access_token', value: response.data['access_token']);
-      await _storage.write(key: 'refresh_token', value: response.data['refresh_token']);
+      final newToken = response.data['access_token'] as String;
+      _cachedAccessToken = newToken;
+      await Future.wait([
+        _storage.write(key: 'access_token', value: newToken),
+        _storage.write(key: 'refresh_token', value: response.data['refresh_token']),
+      ]);
       return true;
     } catch (_) {
       await _clearTokens();
@@ -134,8 +145,11 @@ class ApiService {
   }
 
   Future<void> _clearTokens() async {
-    await _storage.delete(key: 'access_token');
-    await _storage.delete(key: 'refresh_token');
+    _cachedAccessToken = null;
+    await Future.wait([
+      _storage.delete(key: 'access_token'),
+      _storage.delete(key: 'refresh_token'),
+    ]);
   }
 
   // AUTH
@@ -144,8 +158,12 @@ class ApiService {
       'username': username,
       'password': password,
     });
-    await _storage.write(key: 'access_token', value: response.data['access_token']);
-    await _storage.write(key: 'refresh_token', value: response.data['refresh_token']);
+    final accessToken = response.data['access_token'] as String;
+    _cachedAccessToken = accessToken;
+    await Future.wait([
+      _storage.write(key: 'access_token', value: accessToken),
+      _storage.write(key: 'refresh_token', value: response.data['refresh_token']),
+    ]);
     return response.data;
   }
 
@@ -188,8 +206,9 @@ class ApiService {
 
   Future<void> logout() async {
     final refreshToken = await _storage.read(key: 'refresh_token');
-    await _storage.deleteAll();
+    _cachedAccessToken = null;
     _refreshing = false;
+    await _storage.deleteAll();
     try {
       if (refreshToken != null) {
         await Dio(BaseOptions(

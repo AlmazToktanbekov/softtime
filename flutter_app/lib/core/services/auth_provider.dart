@@ -45,15 +45,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<(UserModel, EmployeeModel?)> _fetchUserAndEmployee() async {
+    final user = await _api.getMe();
+    EmployeeModel? emp;
+    try {
+      emp = await _api.getEmployee(user.id);
+    } catch (_) {}
+    return (user, emp);
+  }
+
   Future<String?> login(String username, String password) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _api.login(username, password);
-      final user = await _api.getMe();
-      EmployeeModel? emp;
-      try {
-        emp = await _api.getEmployee(user.id);
-      } catch (_) {}
+      final (user, emp) = await _fetchUserAndEmployee();
       state = state.copyWith(user: user, employee: emp, isLoading: false);
       return null;
     } on DioException catch (e) {
@@ -83,11 +88,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> refreshUser() async {
     try {
-      final user = await _api.getMe();
-      EmployeeModel? emp;
-      try {
-        emp = await _api.getEmployee(user.id);
-      } catch (_) {}
+      final (user, emp) = await _fetchUserAndEmployee();
       state = state.copyWith(user: user, employee: emp);
     } catch (_) {}
   }

@@ -90,13 +90,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         title: const Text('Адрес сервера'),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(hintText: 'http://192.168.1.1:8000'),
+          decoration:
+              const InputDecoration(hintText: 'http://192.168.1.1:8000'),
           keyboardType: TextInputType.url,
           autocorrect: false,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('Сохранить')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: const Text('Сохранить')),
         ],
       ),
     );
@@ -127,7 +131,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
     }
 
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final api = ApiService();
 
@@ -155,7 +162,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         }
       }
 
-      if (mounted) setState(() { _done = true; _loading = false; });
+      if (mounted)
+        setState(() {
+          _done = true;
+          _loading = false;
+        });
     } on DioException catch (e) {
       // Network / no response
       if (e.response == null) {
@@ -178,12 +189,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         // FastAPI validation errors: [{"loc":[...], "msg":"...", ...}, ...]
         try {
           final first = (data['detail'] as List).cast<dynamic>().first;
-          if (first is Map && first['msg'] is String) detail = first['msg'] as String;
+          if (first is Map && first['msg'] is String)
+            detail = first['msg'] as String;
         } catch (_) {}
       }
-      if (mounted) setState(() { _error = detail; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = detail;
+          _loading = false;
+        });
     } catch (_) {
-      if (mounted) setState(() { _error = 'Ошибка подключения'; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = 'Ошибка подключения';
+          _loading = false;
+        });
     }
   }
 
@@ -313,7 +333,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   value: _selectedMentorId,
                   decoration: const InputDecoration(
                     labelText: 'Ментор',
-                    prefixIcon: Icon(Icons.supervisor_account_outlined, size: 20),
+                    prefixIcon:
+                        Icon(Icons.supervisor_account_outlined, size: 20),
                   ),
                   hint: const Text('Выберите ментора'),
                   items: _mentors
@@ -321,7 +342,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                             value: m['id']?.toString(),
                             child: Text(
                               '${m['full_name'] ?? ''} (${_mentorRoleLabel(m['role']?.toString())})',
-                              style: const TextStyle(fontFamily: 'Inter', fontSize: 14),
+                              style: const TextStyle(
+                                  fontFamily: 'Inter', fontSize: 14),
                             ),
                           ))
                       .toList(),
@@ -389,7 +411,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               obscure: _obscurePass,
               suffix: IconButton(
                 icon: Icon(
-                  _obscurePass ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscurePass
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   size: 20,
                   color: AppColors.textHint,
                 ),
@@ -408,11 +432,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               obscure: _obscureConfirm,
               suffix: IconButton(
                 icon: Icon(
-                  _obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
                   size: 20,
                   color: AppColors.textHint,
                 ),
-                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                onPressed: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
               ),
               validator: (v) => v!.isEmpty ? 'Повторите пароль' : null,
             ),
@@ -427,12 +454,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(children: [
-                  const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+                  const Icon(Icons.error_outline_rounded,
+                      color: AppColors.error, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(_error!,
                         style: const TextStyle(
-                            color: AppColors.error, fontSize: 13, fontFamily: 'Inter')),
+                            color: AppColors.error,
+                            fontSize: 13,
+                            fontFamily: 'Inter')),
                   ),
                 ]),
               ),
@@ -448,7 +478,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ? const SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.5, color: Colors.white),
                       )
                     : const Text('Зарегистрироваться'),
               ),
@@ -475,7 +506,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               shape: BoxShape.circle,
               color: AppColors.primaryLight,
               border: Border.all(
-                color: _avatarFile != null ? AppColors.primary : AppColors.border,
+                color:
+                    _avatarFile != null ? AppColors.primary : AppColors.border,
                 width: 2.5,
               ),
               image: _avatarFile != null
@@ -486,7 +518,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   : null,
             ),
             child: _avatarFile == null
-                ? const Icon(Icons.person_rounded, size: 48, color: AppColors.primary)
+                ? const Icon(Icons.person_rounded,
+                    size: 48, color: AppColors.primary)
                 : null,
           ),
           Container(
@@ -496,7 +529,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               color: AppColors.primary,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+            child: const Icon(Icons.camera_alt_rounded,
+                size: 16, color: Colors.white),
           ),
         ],
       ),
@@ -540,7 +574,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ),
             child: Row(
               children: [
-                Icon(icon, color: selected ? AppColors.primary : AppColors.textHint, size: 22),
+                Icon(icon,
+                    color: selected ? AppColors.primary : AppColors.textHint,
+                    size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -552,7 +588,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           fontFamily: 'Inter',
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: selected ? AppColors.primary : AppColors.textPrimary,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -569,7 +607,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
                 if (selected)
-                  const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 22),
+                  const Icon(Icons.check_circle_rounded,
+                      color: AppColors.primary, size: 22),
               ],
             ),
           ),
@@ -579,9 +618,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
     return Column(
       children: [
-        tile('EMPLOYEE', 'Сотрудник', 'Обычный участник команды', Icons.work_outline_rounded),
-        tile('INTERN', 'Стажёр', 'Работает с назначенным ментором', Icons.school_outlined),
-        tile('TEAM_LEAD', 'Ментор', 'Руководит группой; команду оформляет администратор', Icons.groups_outlined),
+        tile('EMPLOYEE', 'Сотрудник', 'Обычный участник команды',
+            Icons.work_outline_rounded),
+        tile('INTERN', 'Стажёр', 'Работает с назначенным ментором',
+            Icons.school_outlined),
+        tile(
+            'TEAM_LEAD',
+            'Ментор',
+            'Руководит группой; команду оформляет администратор',
+            Icons.groups_outlined),
       ],
     );
   }
@@ -597,7 +642,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         LengthLimitingTextInputFormatter(9),
       ],
       onChanged: (_) => setState(() {}),
-      style: const TextStyle(fontFamily: 'Inter', fontSize: 15, color: AppColors.textPrimary),
+      style: const TextStyle(
+          fontFamily: 'Inter', fontSize: 15, color: AppColors.textPrimary),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Введите номер телефона';
         if (v.trim().length < 9) return 'Введите 9 цифр после +996';
@@ -618,7 +664,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               fontFamily: 'Inter',
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.primary,
+              color: Color.fromARGB(255, 15, 65, 130),
             ),
           ),
         ),
@@ -644,7 +690,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       keyboardType: keyboardType,
       validator: validator,
       onChanged: (_) => setState(() {}),
-      style: const TextStyle(fontFamily: 'Inter', fontSize: 15, color: AppColors.textPrimary),
+      style: const TextStyle(
+          fontFamily: 'Inter', fontSize: 15, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
@@ -666,4 +713,3 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 }
-

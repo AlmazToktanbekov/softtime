@@ -38,12 +38,19 @@ final _rootNavigatorKey  = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 final _adminShellNavigatorKey = GlobalKey<NavigatorState>();
 
-// ChangeNotifier, который сообщает GoRouter о смене состояния авторизации.
-// Создаётся один раз — GoRouter НЕ пересоздаётся.
+// ChangeNotifier that caches auth state so redirect never calls ref.read during rebuild.
 class _RouterNotifier extends ChangeNotifier {
+  late AuthState _authState;
+
   _RouterNotifier(Ref ref) {
-    ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+    _authState = ref.read(authProvider);
+    ref.listen<AuthState>(authProvider, (_, next) {
+      _authState = next;
+      notifyListeners();
+    });
   }
+
+  AuthState get authState => _authState;
 }
 
 final _routerNotifierProvider = ChangeNotifierProvider<_RouterNotifier>(
@@ -58,7 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/splash',
     refreshListenable: notifier,
     redirect: (context, state) {
-      final auth = ref.read(authProvider);
+      final auth = notifier.authState;
       final loc = state.matchedLocation;
       final loggedIn = auth.isAuthenticated;
       final isAdmin = auth.isAdmin;

@@ -23,6 +23,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _loadingSchedule = true;
   bool _loadingMentor = false;
   bool _uploadingAvatar = false;
+  int _avatarVersion = 0;
 
   @override
   void initState() {
@@ -71,9 +72,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _uploadingAvatar = true);
     try {
       await ref.read(apiServiceProvider).uploadAvatar(File(picked.path));
-      // Обновить данные пользователя
+      // Сбросить кэш изображений и обновить данные пользователя
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
       await ref.read(authProvider.notifier).refreshUser();
       if (mounted) {
+        setState(() => _avatarVersion++);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Фото профиля обновлено', style: TextStyle(fontWeight: FontWeight.w600)),
           backgroundColor: AppColors.success,
@@ -98,7 +102,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = auth.user;
     final rawAvatar = user?.avatarUrl ?? emp?.avatarUrl;
     final avatarUrl = rawAvatar != null && rawAvatar.isNotEmpty
-        ? ref.read(apiServiceProvider).mediaAbsoluteUrl(rawAvatar)
+        ? '${ref.read(apiServiceProvider).mediaAbsoluteUrl(rawAvatar)}?v=$_avatarVersion'
         : null;
     final fullName = emp?.fullName ?? user?.fullName ?? user?.username ?? '-';
     final firstLetter = fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U';
