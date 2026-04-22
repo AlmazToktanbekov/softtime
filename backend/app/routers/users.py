@@ -33,6 +33,21 @@ router = APIRouter(prefix="/users", tags=["Пользователи"])
 _UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads", "avatars")
 _AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 _AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png"}
+
+
+def _delete_old_avatars(directory: str, user_id: str, keep_filename: str) -> None:
+    """Удалить все старые файлы аватара пользователя, кроме нового."""
+    try:
+        for fname in os.listdir(directory):
+            if fname.startswith(user_id) and fname != keep_filename:
+                try:
+                    os.remove(os.path.join(directory, fname))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 _AVATAR_EXT = {"image/jpeg": ".jpg", "image/png": ".png"}
 
 
@@ -575,8 +590,11 @@ def upload_my_avatar(
             detail="Максимальный размер файла: 5 MB",
         )
     ext = _AVATAR_EXT[file.content_type]
-    filename = f"{current_user.id}{ext}"
+    # Уникальное имя чтобы обойти кэш на клиенте
+    filename = f"{current_user.id}_{int(datetime.now(timezone.utc).timestamp())}{ext}"
     os.makedirs(_UPLOADS_DIR, exist_ok=True)
+    # Удалить старые файлы аватара этого пользователя
+    _delete_old_avatars(_UPLOADS_DIR, str(current_user.id), filename)
     dest_path = os.path.join(_UPLOADS_DIR, filename)
     with open(dest_path, "wb") as f:
         f.write(contents)
@@ -619,8 +637,9 @@ def upload_avatar(
 
     # Save file
     ext = _AVATAR_EXT[file.content_type]
-    filename = f"{user_id}{ext}"
+    filename = f"{user_id}_{int(datetime.now(timezone.utc).timestamp())}{ext}"
     os.makedirs(_UPLOADS_DIR, exist_ok=True)
+    _delete_old_avatars(_UPLOADS_DIR, str(user_id), filename)
     dest_path = os.path.join(_UPLOADS_DIR, filename)
 
     with open(dest_path, "wb") as f:

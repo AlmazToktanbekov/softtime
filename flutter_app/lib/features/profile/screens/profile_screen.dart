@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../providers.dart';
@@ -71,9 +72,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     setState(() => _uploadingAvatar = true);
     try {
+      // Сохраняем старый URL до загрузки чтобы очистить его из кэша
+      final oldRawUrl = ref.read(authProvider).user?.avatarUrl ?? ref.read(authProvider).employee?.avatarUrl;
+      final oldAbsUrl = oldRawUrl != null ? ref.read(apiServiceProvider).mediaAbsoluteUrl(oldRawUrl) : null;
+
       final newAvatarUrl = await ref.read(apiServiceProvider).uploadAvatar(File(picked.path));
+
+      // Очищаем memory-кэш Flutter
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
+      // Очищаем disk-кэш CachedNetworkImage для старого URL
+      if (oldAbsUrl != null && oldAbsUrl.isNotEmpty) {
+        await DefaultCacheManager().removeFile(oldAbsUrl);
+      }
+
       ref.read(authProvider.notifier).updateAvatarUrl(newAvatarUrl);
       if (mounted) {
         setState(() => _avatarVersion++);
