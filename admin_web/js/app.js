@@ -434,6 +434,7 @@ function renderEmployees(list) {
           : `<span class="badge badge-inactive">${statusLabels[e.status] || e.status}</span>`}
       </td>
       <td style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="openEmployeeProfile('${e.id}')" style="color:var(--primary); border-color:var(--primary)">👤 Профиль</button>
         ${e.status === 'ACTIVE'
           ? `<button class="btn btn-ghost btn-sm" onclick="deactivateEmployee('${e.id}')" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
           : (e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="activateEmployee('${e.id}')" style="color:var(--accent); border-color:var(--accent)">Актив.</button>` : '')}
@@ -445,6 +446,110 @@ function renderEmployees(list) {
   }).join('');
 }
 
+
+// ── Employee Profile Modal ────────────────────────────────────────────────────
+async function openEmployeeProfile(userId) {
+  const mediaBase = API.replace(/\/api\/v1\/?$/, '');
+  let emp;
+  try {
+    emp = await apiFetch(`/users/${userId}`);
+  } catch(e) {
+    showToast('Ошибка загрузки профиля: ' + e.message, 'error');
+    return;
+  }
+
+  const avatarSrc = emp.avatar_url
+    ? (emp.avatar_url.startsWith('http') ? emp.avatar_url : `${mediaBase}${emp.avatar_url}`)
+    : null;
+
+  const roleLabels = { SUPER_ADMIN:'Супер Админ', ADMIN:'Админ', TEAM_LEAD:'Тимлид', EMPLOYEE:'Сотрудник', INTERN:'Стажёр' };
+  const statusLabels = { ACTIVE:'Активен', PENDING:'Ожидает', BLOCKED:'Заблокирован', LEAVE:'В отпуске', WARNING:'Предупреждение', DELETED:'Удалён' };
+
+  const avatarBlock = avatarSrc
+    ? `<img id="empProfilePhoto" src="${avatarSrc}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='';this.style.display='none';document.getElementById('empProfileInitial').style.display='flex'">`
+    : '';
+  const initialBlock = `<div id="empProfileInitial" style="width:100px;height:100px;border-radius:50%;background:rgba(26,115,232,0.1);display:${avatarSrc ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:40px;font-weight:800;color:var(--primary)">${(emp.full_name||'?')[0].toUpperCase()}</div>`;
+
+  const fields = [
+    ['ФИО', emp.full_name],
+    ['Логин', '@' + (emp.username||'—')],
+    ['Email', emp.email || '—'],
+    ['Телефон', emp.phone || '—'],
+    ['Роль', roleLabels[emp.role] || emp.role || '—'],
+    ['Статус', statusLabels[emp.status] || emp.status || '—'],
+    ['Команда', emp.team_name || '—'],
+    ['Дата найма', emp.hired_at || '—'],
+    ['Комментарий', emp.admin_comment || '—'],
+  ];
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'empProfileModal';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:480px;width:100%">
+      <div class="modal-header">
+        <span class="modal-title">Профиль сотрудника</span>
+        <button class="modal-close" onclick="document.getElementById('empProfileModal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:20px">
+          <div style="position:relative">
+            ${avatarBlock}${initialBlock}
+            <label title="Загрузить фото" style="position:absolute;bottom:0;right:0;background:var(--primary);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px">
+              📷<input type="file" accept="image/jpeg,image/png" style="display:none" onchange="uploadEmployeeAvatar('${emp.id}', this)">
+            </label>
+          </div>
+          <div style="font-size:18px;font-weight:800;color:var(--text)">${emp.full_name || '—'}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${fields.map(([label, value]) => `
+            <div style="background:var(--bg);border-radius:10px;padding:10px">
+              <div style="font-size:11px;color:var(--text-sub);margin-bottom:3px">${label}</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text);word-break:break-word">${value || '—'}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+async function uploadEmployeeAvatar(userId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const r = await fetch(`${API}/users/${userId}/avatar`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      body: formData,
+    });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail || 'Ошибка загрузки'); }
+    const data = await r.json();
+    const mediaBase = API.replace(/\/api\/v1\/?$/, '');
+    const src = data.avatar_url.startsWith('http') ? data.avatar_url : `${mediaBase}${data.avatar_url}`;
+    const img = document.getElementById('empProfilePhoto');
+    const ini = document.getElementById('empProfileInitial');
+    if (img) { img.src = src; img.style.display = ''; }
+    else {
+      const newImg = document.createElement('img');
+      newImg.id = 'empProfilePhoto';
+      newImg.src = src;
+      newImg.style = 'width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)';
+      ini?.parentElement?.insertBefore(newImg, ini);
+    }
+    if (ini) ini.style.display = 'none';
+    // update cached employee avatar
+    const emp = allEmployees.find(e => e.id === userId);
+    if (emp) emp.avatar_url = data.avatar_url;
+    showToast('Фото обновлено', 'success');
+  } catch(e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
+}
 
 function filterEmployees() {
   const search = document.getElementById('empSearch').value.toLowerCase();
