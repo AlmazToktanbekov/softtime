@@ -149,25 +149,27 @@ def process_check_out(
     record.qr_verified_out = True
     record.office_network_id = office_network_id
 
-    if record.status == AttendanceStatus.LATE:
+    # Определяем статус ухода по расписанию (независимо от статуса прихода)
+    check_out_st = CheckOutStatus.ON_TIME
+    if schedule and schedule.is_working_day and schedule.end_time:
+        expected_end = datetime.combine(today, schedule.end_time, tzinfo=now.tzinfo)
+        if now < expected_end:
+            check_out_st = CheckOutStatus.LEFT_EARLY
+        elif now > expected_end:
+            check_out_st = CheckOutStatus.OVERTIME
+
+    record.check_out_status = check_out_st
+
+    # LATE сохраняется если опоздал, иначе определяем по уходу
+    was_late = record.status == AttendanceStatus.LATE
+    if was_late:
         final_status = AttendanceStatus.LATE
-        record.check_out_status = CheckOutStatus.ON_TIME
+    elif check_out_st == CheckOutStatus.LEFT_EARLY:
+        final_status = AttendanceStatus.EARLY_LEAVE
+    elif check_out_st == CheckOutStatus.OVERTIME:
+        final_status = AttendanceStatus.OVERTIME
     else:
-        if schedule and schedule.is_working_day and schedule.end_time:
-            expected_end = datetime.combine(today, schedule.end_time, tzinfo=now.tzinfo)
-            if now < expected_end:
-                final_status = AttendanceStatus.EARLY_LEAVE
-                record.check_out_status = CheckOutStatus.LEFT_EARLY
-            elif now > expected_end:
-                final_status = AttendanceStatus.OVERTIME
-                record.check_out_status = CheckOutStatus.OVERTIME
-            else:
-                final_status = AttendanceStatus.PRESENT
-                record.check_out_status = CheckOutStatus.ON_TIME
-        else:
-            # Расписания нет — просто фиксируем уход как обычный
-            final_status = AttendanceStatus.PRESENT
-            record.check_out_status = CheckOutStatus.ON_TIME
+        final_status = AttendanceStatus.PRESENT
 
     record.status = final_status
 

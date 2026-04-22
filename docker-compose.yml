@@ -41,6 +41,7 @@ services:
       REDIS_URL: redis://redis:6379
       # Веб-админка (статика): каталог внутри контейнера
       ADMIN_WEB_DIR: /app/admin_web
+      TZ: Asia/Bishkek
     depends_on:
       db:
         condition: service_healthy

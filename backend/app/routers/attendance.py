@@ -41,20 +41,24 @@ def _fmt_time(dt) -> Optional[str]:
     return dt.strftime("%H:%M")
 
 
+def _to_naive_local(dt: datetime) -> datetime:
+    """Convert tz-aware datetime to naive local time for schedule comparison."""
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
 def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
     user = db.query(User).filter(User.id == a.user_id).first()
     fmt_in = _fmt_time(a.check_in_time)
     fmt_out = _fmt_time(a.check_out_time)
 
+    late_minutes = 0
     early_arrival_minutes = 0
     early_leave_minutes = 0
     overtime_minutes = 0
 
-    needs_schedule = (
-        a.check_in_status == CheckInStatus.EARLY_ARRIVAL
-        or a.check_out_status in (CheckOutStatus.LEFT_EARLY, CheckOutStatus.OVERTIME)
-    )
-    if needs_schedule and a.date:
+    if a.date and a.check_in_time:
         schedule = (
             db.query(EmployeeSchedule)
             .filter(
@@ -64,29 +68,26 @@ def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
             .first()
         )
         if schedule and schedule.is_working_day:
-            if a.check_in_status == CheckInStatus.EARLY_ARRIVAL and schedule.start_time and a.check_in_time:
-                check_in_naive = (
-                    a.check_in_time.astimezone().replace(tzinfo=None)
-                    if a.check_in_time.tzinfo else a.check_in_time
-                )
+            check_in_naive = _to_naive_local(a.check_in_time)
+
+            # Рассчитываем опоздание / ранний приход
+            if schedule.start_time:
                 expected_start = datetime.combine(a.date, schedule.start_time)
-                early_arrival_minutes = max(int((expected_start - check_in_naive).total_seconds() // 60), 0)
+                diff_in = int((check_in_naive - expected_start).total_seconds() // 60)
+                if diff_in > 0:
+                    late_minutes = diff_in
+                elif diff_in < 0:
+                    early_arrival_minutes = -diff_in
 
-            if a.check_out_status == CheckOutStatus.LEFT_EARLY and schedule.end_time and a.check_out_time:
-                check_out_naive = (
-                    a.check_out_time.astimezone().replace(tzinfo=None)
-                    if a.check_out_time.tzinfo else a.check_out_time
-                )
+            # Рассчитываем ранний уход / сверхурочные
+            if schedule.end_time and a.check_out_time:
+                check_out_naive = _to_naive_local(a.check_out_time)
                 expected_end = datetime.combine(a.date, schedule.end_time)
-                early_leave_minutes = max(int((expected_end - check_out_naive).total_seconds() // 60), 0)
-
-            if a.check_out_status == CheckOutStatus.OVERTIME and schedule.end_time and a.check_out_time:
-                check_out_naive = (
-                    a.check_out_time.astimezone().replace(tzinfo=None)
-                    if a.check_out_time.tzinfo else a.check_out_time
-                )
-                expected_end = datetime.combine(a.date, schedule.end_time)
-                overtime_minutes = max(int((check_out_naive - expected_end).total_seconds() // 60), 0)
+                diff_out = int((check_out_naive - expected_end).total_seconds() // 60)
+                if diff_out < 0:
+                    early_leave_minutes = -diff_out
+                elif diff_out > 0:
+                    overtime_minutes = diff_out
 
     return AttendanceResponse(
         id=a.id,
@@ -100,15 +101,15 @@ def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
         work_duration=a.work_duration,
         work_minutes=a.work_minutes,
         status=a.status,
-        late_minutes=a.late_minutes or 0,
+        late_minutes=late_minutes,
         early_arrival_minutes=early_arrival_minutes,
         early_leave_minutes=early_leave_minutes,
         overtime_minutes=overtime_minutes,
         underwork_minutes=0,
-        is_late=(a.late_minutes or 0) > 0,
-        came_early=a.check_in_status == CheckInStatus.EARLY_ARRIVAL,
-        left_early=a.check_out_status == CheckOutStatus.LEFT_EARLY,
-        left_late=a.check_out_status == CheckOutStatus.OVERTIME,
+        is_late=late_minutes > 0,
+        came_early=early_arrival_minutes > 0,
+        left_early=early_leave_minutes > 0,
+        left_late=overtime_minutes > 0,
         check_in_ip=a.check_in_ip,
         check_out_ip=a.check_out_ip,
         qr_verified_in=bool(a.qr_verified_in),
