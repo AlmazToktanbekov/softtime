@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http_parser/http_parser.dart';
 import '../config/app_config.dart';
 import '../models/user_model.dart';
 import '../models/attendance_model.dart';
@@ -697,12 +698,19 @@ class ApiService {
     await dio.delete('/teams/$teamId');
   }
 
+  MediaType _imageMediaType(String path) {
+    final ext = path.toLowerCase().split('.').last;
+    return ext == 'png' ? MediaType('image', 'png') : MediaType('image', 'jpeg');
+  }
+
   // AVATAR UPLOAD
   Future<String> uploadAvatar(File imageFile) async {
+    final filename = imageFile.path.split('/').last;
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(
         imageFile.path,
-        filename: imageFile.path.split('/').last,
+        filename: filename,
+        contentType: _imageMediaType(imageFile.path),
       ),
     });
     final response = await dio.patch('/users/me/avatar', data: formData);
@@ -711,10 +719,12 @@ class ApiService {
 
   /// Upload avatar using a one-time token (e.g. upload_token from /register).
   Future<String> uploadAvatarWithToken(File imageFile, String token) async {
+    final filename = imageFile.path.split('/').last;
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(
         imageFile.path,
-        filename: imageFile.path.split('/').last,
+        filename: filename,
+        contentType: _imageMediaType(imageFile.path),
       ),
     });
     final d = Dio(BaseOptions(

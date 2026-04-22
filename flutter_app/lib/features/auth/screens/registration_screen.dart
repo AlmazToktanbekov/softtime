@@ -29,6 +29,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   bool _loading = false;
   String? _error;
   bool _done = false;
+  bool _avatarUploadFailed = false;
 
   /// EMPLOYEE | INTERN | TEAM_LEAD (ментор)
   String _selectedRole = 'EMPLOYEE';
@@ -154,11 +155,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
       // 2. Upload avatar using the one-time token (no login needed)
       final uploadToken = regResult['upload_token'] as String?;
+      bool avatarOk = false;
       if (uploadToken != null && _avatarFile != null) {
         try {
           await api.uploadAvatarWithToken(_avatarFile!, uploadToken);
+          avatarOk = true;
         } catch (_) {
-          // Avatar upload failed — not critical, continue
+          avatarOk = false;
         }
       }
 
@@ -166,6 +169,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         setState(() {
           _done = true;
           _loading = false;
+          _avatarUploadFailed = !avatarOk;
         });
     } on DioException catch (e) {
       // Network / no response
@@ -268,6 +272,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               textAlign: TextAlign.center,
             ),
+            if (_avatarUploadFailed) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Фото профиля не удалось загрузить. Вы сможете добавить его в профиле после входа.',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: AppColors.warning,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 36),
             SizedBox(
               width: double.infinity,
