@@ -65,6 +65,15 @@ class _AdminAttendanceScreenState
     }
   }
 
+  // Returns timezone offset string like "+06:00" for use in ISO datetime strings.
+  String _tzOffset() {
+    final offset = DateTime.now().timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final h = offset.inHours.abs().toString().padLeft(2, '0');
+    final m = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    return '$sign$h:$m';
+  }
+
   int get _present =>
       _records.where((r) => r.status == 'PRESENT' || r.status == 'LATE' || r.status == 'OVERTIME').length;
   int get _late => _records.where((r) => r.status == 'LATE').length;
@@ -585,13 +594,14 @@ class _AdminAttendanceScreenState
                 try {
                   if (existing.isNotEmpty) {
                     final data = <String, dynamic>{'is_manual': true};
+                    final tz = _tzOffset();
                     if (checkInCtrl.text.isNotEmpty) {
                       data['check_in_time'] =
-                          '${dateStr}T${checkInCtrl.text}:00';
+                          '${dateStr}T${checkInCtrl.text}:00$tz';
                     }
                     if (checkOutCtrl.text.isNotEmpty) {
                       data['check_out_time'] =
-                          '${dateStr}T${checkOutCtrl.text}:00';
+                          '${dateStr}T${checkOutCtrl.text}:00$tz';
                     }
                     if (noteCtrl.text.isNotEmpty) {
                       data['note'] = noteCtrl.text.trim();
@@ -664,11 +674,13 @@ class _AdminAttendanceScreenState
           ElevatedButton(
             onPressed: () async {
               final data = <String, dynamic>{'is_manual': true};
+              final tz = _tzOffset();
               if (checkInCtrl.text.isNotEmpty) {
-                data['check_in_time'] = '${dateStr}T${checkInCtrl.text}:00';
+                data['check_in_time'] = '${dateStr}T${checkInCtrl.text}:00$tz';
               }
               if (checkOutCtrl.text.isNotEmpty) {
-                data['check_out_time'] = '${dateStr}T${checkOutCtrl.text}:00';
+                data['check_out_time'] =
+                    '${dateStr}T${checkOutCtrl.text}:00$tz';
               }
               if (noteCtrl.text.isNotEmpty) {
                 data['note'] = noteCtrl.text.trim();

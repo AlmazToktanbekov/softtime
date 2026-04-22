@@ -31,12 +31,6 @@ dependencies:
   # Image picker (gallery / camera)
   image_picker: ^1.1.2
 
-  # Push notifications (Firebase Cloud Messaging)
-  # Требует: google-services.json (Android) и GoogleService-Info.plist (iOS)
-  # из Firebase Console → Project Settings → Your apps
-  firebase_core: ^3.3.0
-  firebase_messaging: ^15.1.0
-
   # Image caching
   cached_network_image: ^3.3.0
 

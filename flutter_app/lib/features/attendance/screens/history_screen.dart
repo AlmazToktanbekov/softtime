@@ -250,22 +250,39 @@ class _AttendanceCard extends StatelessWidget {
               ],
             ],
           ),
-          if (record.lateMinutes > 0) ...[
+          if (record.lateMinutes > 0 ||
+              record.earlyArrivalMinutes > 0 ||
+              record.earlyLeaveMinutes > 0 ||
+              record.overtimeMinutes > 0) ...[
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: AppColors.warning, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  'Опоздание: ${record.lateMinutes} мин',
-                  style: const TextStyle(
+                if (record.lateMinutes > 0)
+                  _StatChip(
+                    icon: Icons.warning_amber_rounded,
+                    label: 'Опоздание: ${record.lateMinutes} мин',
                     color: AppColors.warning,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
                   ),
-                ),
+                if (record.earlyArrivalMinutes > 0)
+                  _StatChip(
+                    icon: Icons.arrow_upward_rounded,
+                    label: 'Пришёл раньше: ${record.earlyArrivalMinutes} мин',
+                    color: AppColors.success,
+                  ),
+                if (record.earlyLeaveMinutes > 0)
+                  _StatChip(
+                    icon: Icons.arrow_downward_rounded,
+                    label: 'Ушёл раньше: ${record.earlyLeaveMinutes} мин',
+                    color: AppColors.error,
+                  ),
+                if (record.overtimeMinutes > 0)
+                  _StatChip(
+                    icon: Icons.more_time_rounded,
+                    label: 'Сверхурочно: ${record.overtimeMinutes} мин',
+                    color: AppColors.primary,
+                  ),
               ],
             ),
           ],
@@ -392,6 +409,45 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
               fontFamily: 'Inter',
             ),
           ),

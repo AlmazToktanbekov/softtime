@@ -1257,30 +1257,46 @@ class _AttendanceCard extends StatelessWidget {
                     ],
                   ]),
 
-                  // late warning
-                  if (record != null && record!.lateMinutes > 0) ...[
+                  // stats: late / early arrival / early leave / overtime
+                  if (record != null && (
+                      record!.lateMinutes > 0 ||
+                      record!.earlyArrivalMinutes > 0 ||
+                      record!.earlyLeaveMinutes > 0 ||
+                      record!.overtimeMinutes > 0)) ...[
                     const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.warningLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(children: [
-                        const Icon(Icons.warning_amber_rounded,
-                            color: AppColors.warning, size: 15),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Опоздание: ${record!.lateMinutes} мин',
-                          style: const TextStyle(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        if (record!.lateMinutes > 0)
+                          _StatChip(
+                            icon: Icons.warning_amber_rounded,
+                            label: 'Опоздание: ${record!.lateMinutes} мин',
                             color: AppColors.warning,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
+                            bg: AppColors.warningLight,
                           ),
-                        ),
-                      ]),
+                        if (record!.earlyArrivalMinutes > 0)
+                          _StatChip(
+                            icon: Icons.arrow_upward_rounded,
+                            label: 'Раньше: ${record!.earlyArrivalMinutes} мин',
+                            color: AppColors.success,
+                            bg: AppColors.successLight,
+                          ),
+                        if (record!.earlyLeaveMinutes > 0)
+                          _StatChip(
+                            icon: Icons.arrow_downward_rounded,
+                            label: 'Ушёл раньше: ${record!.earlyLeaveMinutes} мин',
+                            color: AppColors.error,
+                            bg: AppColors.error.withOpacity(0.08),
+                          ),
+                        if (record!.overtimeMinutes > 0)
+                          _StatChip(
+                            icon: Icons.more_time_rounded,
+                            label: 'Сверхурочно: ${record!.overtimeMinutes} мин',
+                            color: AppColors.primary,
+                            bg: AppColors.primaryLight,
+                          ),
+                      ],
                     ),
                   ],
 
@@ -2293,6 +2309,47 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
             )
           else
             const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bg;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Inter',
+            ),
+          ),
         ],
       ),
     );
