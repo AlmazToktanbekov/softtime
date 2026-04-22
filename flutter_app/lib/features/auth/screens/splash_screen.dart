@@ -32,11 +32,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    // Минимум 1.8 с на splash, параллельно инициализируем авторизацию
-    await Future.wait([
-      Future.delayed(const Duration(milliseconds: 1800)),
-      ref.read(authProvider.notifier).init(),
-    ]);
+    try {
+      await Future.wait([
+        Future.delayed(const Duration(milliseconds: 1800)),
+        ref
+            .read(authProvider.notifier)
+            .init()
+            .timeout(const Duration(seconds: 10), onTimeout: () => false),
+      ]);
+    } catch (_) {
+      // При любой ошибке — отправляем на логин
+    }
     if (!mounted) return;
     final auth = ref.read(authProvider);
     if (auth.isAuthenticated) {

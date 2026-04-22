@@ -31,8 +31,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._api) : super(const AuthState());
 
   Future<bool> init() async {
-    if (!await _api.isLoggedIn()) return false;
     try {
+      if (!await _api.isLoggedIn()) return false;
       final user = await _api.getMe();
       EmployeeModel? emp;
       try {
@@ -91,6 +91,47 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final (user, emp) = await _fetchUserAndEmployee();
       state = state.copyWith(user: user, employee: emp);
     } catch (_) {}
+  }
+
+  void updateAvatarUrl(String avatarUrl) {
+    final user = state.user;
+    if (user == null) return;
+    final updatedUser = UserModel(
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      phone: user.phone,
+      fullName: user.fullName,
+      teamName: user.teamName,
+      teamId: user.teamId,
+      mentorId: user.mentorId,
+      avatarUrl: avatarUrl,
+      hiredAt: user.hiredAt,
+    );
+    final emp = state.employee;
+    final updatedEmp = emp == null
+        ? null
+        : EmployeeModel(
+            id: emp.id,
+            fullName: emp.fullName,
+            email: emp.email,
+            phone: emp.phone,
+            teamName: emp.teamName,
+            teamId: emp.teamId,
+            mentorId: emp.mentorId,
+            avatarUrl: avatarUrl,
+            hireDate: emp.hireDate,
+            status: emp.status,
+            role: emp.role,
+          );
+    state = AuthState(
+      user: updatedUser,
+      employee: updatedEmp,
+      isLoading: state.isLoading,
+      error: state.error,
+    );
   }
 
   Future<void> logout() async {

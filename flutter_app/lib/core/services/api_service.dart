@@ -15,7 +15,15 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  final _storage = const FlutterSecureStorage();
+  final _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
   static const String _baseUrlStorageKey = 'api_base_url';
   late String _baseUrl = AppConfig.baseUrl;
   Dio? _dio;
@@ -220,8 +228,14 @@ class ApiService {
   }
 
   Future<bool> isLoggedIn() async {
-    final token = await _storage.read(key: 'access_token');
-    return token != null;
+    if (_cachedAccessToken != null) return true;
+    try {
+      final token = await _storage.read(key: 'access_token');
+      _cachedAccessToken = token;
+      return token != null;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Сохранить FCM токен на сервере для получения push-уведомлений.

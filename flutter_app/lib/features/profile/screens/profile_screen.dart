@@ -71,11 +71,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     setState(() => _uploadingAvatar = true);
     try {
-      await ref.read(apiServiceProvider).uploadAvatar(File(picked.path));
-      // Сбросить кэш изображений и обновить данные пользователя
+      final newAvatarUrl = await ref.read(apiServiceProvider).uploadAvatar(File(picked.path));
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-      await ref.read(authProvider.notifier).refreshUser();
+      ref.read(authProvider.notifier).updateAvatarUrl(newAvatarUrl);
       if (mounted) {
         setState(() => _avatarVersion++);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
