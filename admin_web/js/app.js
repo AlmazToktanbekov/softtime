@@ -385,7 +385,11 @@ async function loadDashboard() {
       const weekStart = weekStartD.toISOString().split('T')[0];
       const weekly = await apiFetch(`/reports/period?start_date=${weekStart}&end_date=${weekEnd}`);
       renderDashWeekChart(weekly.chart_data || []);
-    } catch(_) {}
+    } catch(err) {
+      console.error('Ошибка загрузки недельного графика:', err);
+      const wrap = document.getElementById('dashWeekChartWrap');
+      if (wrap) wrap.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:80px 0">Ошибка загрузки данных</p>`;
+    }
 
   } catch (e) {
     console.error(e);
@@ -396,8 +400,14 @@ async function loadDashboard() {
 let dashWeekChart = null;
 function renderDashWeekChart(chartData) {
   if (dashWeekChart) { dashWeekChart.destroy(); dashWeekChart = null; }
+  const wrap = document.getElementById('dashWeekChartWrap');
   const canvas = document.getElementById('dashWeekChart');
-  if (!canvas || !chartData.length) return;
+  if (!canvas) return;
+
+  if (!chartData || !chartData.length) {
+    if (wrap) wrap.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:80px 0">Нет данных за неделю</p>';
+    return;
+  }
 
   const dayLabels = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
   const labels = chartData.map(d => {
@@ -417,6 +427,7 @@ function renderDashWeekChart(chartData) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' } },
       scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } },
     },
@@ -526,12 +537,12 @@ async function openEmployeeProfile(userId) {
   modal.className = 'modal-overlay open';
   modal.id = 'empProfileModal';
   modal.innerHTML = `
-    <div class="modal-card" style="max-width:480px;width:100%">
+    <div class="modal" style="max-width:480px;width:100%">
       <div class="modal-header">
         <span class="modal-title">Профиль сотрудника</span>
         <button class="modal-close" onclick="document.getElementById('empProfileModal').remove()">✕</button>
       </div>
-      <div class="modal-body">
+      <div style="padding:20px">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:20px">
           <div style="position:relative">
             ${avatarBlock}${initialBlock}
@@ -549,17 +560,14 @@ async function openEmployeeProfile(userId) {
             </div>
           `).join('')}
         </div>
-        <div id="empEditNameForm" style="display:none;margin-top:16px;padding:14px;background:var(--bg);border-radius:12px">
-          <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Новое ФИО</div>
+
+        <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">✏️ Изменить ФИО</div>
           <input id="empEditNameInput" class="form-input" style="margin-bottom:10px" placeholder="Иванов Иван Иванович" value="${(emp.full_name||'').replace(/"/g,'&quot;')}">
           <div style="display:flex;gap:8px">
-            <button class="btn btn-primary btn-sm" onclick="saveEmployeeName('${emp.id}')">Сохранить</button>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('empEditNameForm').style.display='none'">Отмена</button>
+            <button class="btn btn-primary" onclick="saveEmployeeName('${emp.id}')">Сохранить</button>
           </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('empEditNameForm').style.display=document.getElementById('empEditNameForm').style.display==='none'?'block':'none'">✏️ Изменить ФИО</button>
       </div>
     </div>
   `;
@@ -580,7 +588,7 @@ async function saveEmployeeName(userId) {
     document.getElementById('empEditNameForm').style.display = 'none';
     const emp = allEmployees.find(e => e.id === userId);
     if (emp) emp.full_name = updated.full_name;
-    renderEmployees(allEmployees.filter(e => e.status !== 'PENDING'));
+    filterEmployees();
     showToast('ФИО обновлено', 'success');
   } catch(e) {
     showToast('Ошибка: ' + e.message, 'error');
