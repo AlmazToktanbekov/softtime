@@ -377,10 +377,50 @@ async function loadDashboard() {
         ${statusBadge(r.status)}
       </div>
     `).join('');
+
+    // Недельный график
+    try {
+      const weekEnd = today;
+      const weekStartD = new Date(Date.now() - 6 * 86400000);
+      const weekStart = weekStartD.toISOString().split('T')[0];
+      const weekly = await apiFetch(`/reports/period?start_date=${weekStart}&end_date=${weekEnd}`);
+      renderDashWeekChart(weekly.chart_data || []);
+    } catch(_) {}
+
   } catch (e) {
     console.error(e);
     showToast('Ошибка загрузки дашборда: ' + e.message, 'error');
   }
+}
+
+let dashWeekChart = null;
+function renderDashWeekChart(chartData) {
+  if (dashWeekChart) { dashWeekChart.destroy(); dashWeekChart = null; }
+  const canvas = document.getElementById('dashWeekChart');
+  if (!canvas || !chartData.length) return;
+
+  const dayLabels = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const labels = chartData.map(d => {
+    const dt = new Date(d.date + 'T00:00:00');
+    return dayLabels[dt.getDay()] + ' ' + dt.getDate();
+  });
+
+  dashWeekChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Присутствовали', data: chartData.map(d => d.present), backgroundColor: 'rgba(24,119,242,0.75)', borderRadius: 6 },
+        { label: 'Опоздали',       data: chartData.map(d => d.late),    backgroundColor: 'rgba(251,188,4,0.75)',  borderRadius: 6 },
+        { label: 'Отсутствовали',  data: chartData.map(d => d.absent),  backgroundColor: 'rgba(234,67,53,0.6)',   borderRadius: 6 },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { stacked: false }, y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    },
+  });
 }
 // =========== EMPLOYEES ===========
 async function loadEmployees() {
@@ -499,7 +539,7 @@ async function openEmployeeProfile(userId) {
               📷<input type="file" accept="image/jpeg,image/png" style="display:none" onchange="uploadEmployeeAvatar('${emp.id}', this)">
             </label>
           </div>
-          <div style="font-size:18px;font-weight:800;color:var(--text)">${emp.full_name || '—'}</div>
+          <div id="empProfileNameDisplay" style="font-size:18px;font-weight:800;color:var(--text)">${emp.full_name || '—'}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${fields.map(([label, value]) => `
@@ -509,11 +549,42 @@ async function openEmployeeProfile(userId) {
             </div>
           `).join('')}
         </div>
+        <div id="empEditNameForm" style="display:none;margin-top:16px;padding:14px;background:var(--bg);border-radius:12px">
+          <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Новое ФИО</div>
+          <input id="empEditNameInput" class="form-input" style="margin-bottom:10px" placeholder="Иванов Иван Иванович" value="${(emp.full_name||'').replace(/"/g,'&quot;')}">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="saveEmployeeName('${emp.id}')">Сохранить</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('empEditNameForm').style.display='none'">Отмена</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('empEditNameForm').style.display=document.getElementById('empEditNameForm').style.display==='none'?'block':'none'">✏️ Изменить ФИО</button>
       </div>
     </div>
   `;
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
+}
+
+async function saveEmployeeName(userId) {
+  const input = document.getElementById('empEditNameInput');
+  const newName = input.value.trim();
+  if (!newName) { showToast('Введите ФИО', 'error'); return; }
+  try {
+    const updated = await apiFetch(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ full_name: newName }),
+    });
+    document.getElementById('empProfileNameDisplay').textContent = updated.full_name;
+    document.getElementById('empEditNameForm').style.display = 'none';
+    const emp = allEmployees.find(e => e.id === userId);
+    if (emp) emp.full_name = updated.full_name;
+    renderEmployees(allEmployees.filter(e => e.status !== 'PENDING'));
+    showToast('ФИО обновлено', 'success');
+  } catch(e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
 }
 
 async function uploadEmployeeAvatar(userId, input) {

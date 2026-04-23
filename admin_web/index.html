@@ -82,13 +82,6 @@
     </div>
   </div>
 
-  <div class="sidebar-section">
-    <p class="sidebar-section-label">Настройки</p>
-    <div class="sidebar-item" onclick="showPage('worktime', this)">
-      <span class="nav-icon">⏰</span> Рабочее время
-    </div>
-  </div>
-
   <div class="sidebar-footer">
     <div class="sidebar-item" onclick="doLogout()" style="color:var(--error)">
       <span class="nav-icon">🚪</span> Выйти
@@ -195,6 +188,13 @@
           </div>
           <div id="latestRecords"></div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top:24px">
+        <div class="card-header">
+          <div class="card-title">📈 Посещаемость за неделю</div>
+        </div>
+        <canvas id="dashWeekChart" style="max-height:260px"></canvas>
       </div>
     </div>
 

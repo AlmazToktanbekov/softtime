@@ -13,6 +13,15 @@ from app.utils.dependencies import require_admin_or_teamlead, get_current_user
 router = APIRouter(prefix="/reports", tags=["Отчёты"])
 
 
+def _fmt_time(dt) -> Optional[str]:
+    """Format datetime to HH:MM in server local timezone."""
+    if not dt:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone().strftime("%H:%M")
+    return dt.strftime("%H:%M")
+
+
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
 def _build_summary(records: list, employees: list) -> dict:
@@ -44,8 +53,8 @@ def _emp_detail(r: Attendance, emp_map: dict) -> dict:
         "user_id": str(r.user_id),
         "employee_name": emp.full_name if emp else "Неизвестно",
         "team_name": getattr(emp, "team_name", None) if emp else None,
-        "check_in_time": r.check_in_time.strftime("%H:%M") if r.check_in_time else None,
-        "check_out_time": r.check_out_time.strftime("%H:%M") if r.check_out_time else None,
+        "check_in_time": _fmt_time(r.check_in_time),
+        "check_out_time": _fmt_time(r.check_out_time),
         "status": r.status.value if hasattr(r.status, "value") else str(r.status),
         "late_minutes": r.late_minutes or 0,
         "work_duration": r.work_duration,
@@ -268,8 +277,8 @@ def employee_report(
     detail = [
         {
             "date": str(r.date),
-            "check_in": r.check_in_time.strftime("%H:%M") if r.check_in_time else None,
-            "check_out": r.check_out_time.strftime("%H:%M") if r.check_out_time else None,
+            "check_in": _fmt_time(r.check_in_time),
+            "check_out": _fmt_time(r.check_out_time),
             "status": r.status.value if hasattr(r.status, "value") else str(r.status),
             "late_minutes": r.late_minutes or 0,
             "work_duration": r.work_duration,
