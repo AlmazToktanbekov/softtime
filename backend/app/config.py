@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         "https://softjol.site",
     ]
 
+    # Ключ для публичных эндпоинтов регистрации (Flutter app)
+    APP_REGISTRATION_KEY: str = "change-me-registration-key"
+
     # Auto-create tables on startup — отключено, используется Alembic
     AUTO_CREATE_TABLES: bool = False
 

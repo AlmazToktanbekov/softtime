@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,6 +19,7 @@ from app.utils.fcm import notify_users
 from app.utils.redis_client import (
     blacklist_token,
     clear_failed_attempts,
+    is_ip_blocked,
     is_login_blocked,
     is_token_blacklisted,
     record_failed_attempt,
@@ -38,8 +39,14 @@ _MENTOR_ROLES = (UserRole.TEAM_LEAD, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 
 
 @router.get("/register/mentors")
-def list_register_mentors(db: Session = Depends(get_db)):
-    """Публичный список менторов для регистрации стажёра (без авторизации)."""
+def list_register_mentors(
+    x_app_key: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """Список менторов для регистрации стажёра. Требует заголовок X-App-Key."""
+    from app.config import settings
+    if not x_app_key or x_app_key != settings.APP_REGISTRATION_KEY:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Нет доступа")
     users = (
         db.query(User)
         .filter(
@@ -137,7 +144,14 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     Login with username (or email) + password.
     Brute-force protection: 5 failed attempts → 15-minute block.
     """
+    client_ip = request.headers.get("X-Real-IP") or request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (request.client.host if request.client else "unknown")
     username_key = data.username.lower()
+
+    if is_ip_blocked(client_ip):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Слишком много неудачных попыток. Попробуйте через 1 час.",
+        )
 
     if is_login_blocked(username_key):
         raise HTTPException(
@@ -150,9 +164,9 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     ).first()
 
     if not user or not verify_password(data.password, user.password_hash):
-        count = record_failed_attempt(username_key)
+        count = record_failed_attempt(username_key, ip=client_ip)
         remaining = max(0, 5 - count)
-        detail = f"Неверный логин или пароль."
+        detail = "Неверный логин или пароль."
         if remaining > 0:
             detail += f" Осталось попыток: {remaining}."
         else:

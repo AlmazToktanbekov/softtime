@@ -63,10 +63,16 @@ def is_token_blacklisted(jti: str) -> bool:
 
 _MAX_ATTEMPTS = 5
 _BLOCK_SECONDS = 15 * 60  # 15 minutes
+_IP_MAX_ATTEMPTS = 20     # block IP after 20 failed attempts
+_IP_BLOCK_SECONDS = 60 * 60  # 1 hour
 
 
 def _bf_key(username: str) -> str:
     return f"bf:{username.lower()}"
+
+
+def _ip_key(ip: str) -> str:
+    return f"bf_ip:{ip}"
 
 
 def is_login_blocked(username: str) -> bool:
@@ -80,7 +86,18 @@ def is_login_blocked(username: str) -> bool:
         return False
 
 
-def record_failed_attempt(username: str) -> int:
+def is_ip_blocked(ip: str) -> bool:
+    r = get_redis()
+    if not r:
+        return False
+    try:
+        val = r.get(_ip_key(ip))
+        return bool(val and int(val) >= _IP_MAX_ATTEMPTS)
+    except Exception:
+        return False
+
+
+def record_failed_attempt(username: str, ip: Optional[str] = None) -> int:
     r = get_redis()
     if not r:
         return 0
@@ -89,6 +106,10 @@ def record_failed_attempt(username: str) -> int:
         count = r.incr(key)
         if count == 1:
             r.expire(key, _BLOCK_SECONDS)
+        if ip:
+            ip_key = _ip_key(ip)
+            r.incr(ip_key)
+            r.expire(ip_key, _IP_BLOCK_SECONDS)
         return count
     except Exception:
         return 0
@@ -102,3 +123,8 @@ def clear_failed_attempts(username: str) -> None:
         r.delete(_bf_key(username))
     except Exception:
         pass
+
+
+# ── Public redis_client reference ─────────────────────────────────────────────
+
+redis_client = get_redis()
