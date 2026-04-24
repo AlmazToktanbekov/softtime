@@ -36,7 +36,7 @@ class FcmService {
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings();
       const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
-      await _localNotifications.initialize(initSettings);
+      await _localNotifications.initialize(settings: initSettings);
 
       // Listen to foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -86,10 +86,10 @@ class FcmService {
     const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     await _localNotifications.show(
-      message.hashCode,
-      message.notification?.title,
-      message.notification?.body,
-      details,
+      id: message.hashCode,
+      title: message.notification?.title,
+      body: message.notification?.body,
+      notificationDetails: details,
     );
   }
 
