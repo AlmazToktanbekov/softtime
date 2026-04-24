@@ -54,6 +54,7 @@ class _MainShellState extends ConsumerState<MainShell>
         notifier.clearDuty();
         context.go('/duty');
       case 2:
+        notifier.clearNews();
         context.go('/news');
       case 3:
         notifier.clearRequests();
@@ -103,6 +104,7 @@ class _MainShellState extends ConsumerState<MainShell>
                   activeIcon: Icons.article_rounded,
                   label: 'Новости',
                   isActive: idx == 2,
+                  hasBadge: badges.news,
                   onTap: () => _onNavTap(context, 2),
                 ),
                 _NavItem(

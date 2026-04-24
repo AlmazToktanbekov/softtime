@@ -600,6 +600,12 @@ class ApiService {
     return response.data;
   }
 
+  Future<List<News>> getUnreadNews() async {
+    final response = await dio.get('/news/unread');
+    final list = response.data as List;
+    return list.map((e) => News.fromJson(e)).toList();
+  }
+
   // DUTY — ADMIN
   Future<DutyAssignment> assignDuty({
     required String userId,
