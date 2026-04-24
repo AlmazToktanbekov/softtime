@@ -79,6 +79,7 @@ class PaginatedUsers(BaseModel):
 
 class UserUpdateRequest(BaseModel):
     full_name: Optional[str] = None
+    username: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[UserRole] = None

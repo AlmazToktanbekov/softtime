@@ -188,6 +188,10 @@ def update_user(
     target = _get_user_or_404(db, user_id)
 
     # Uniqueness checks for changed fields
+    if data.username and data.username != target.username:
+        if db.query(User).filter(User.username == data.username, User.id != user_id).first():
+            raise HTTPException(status.HTTP_409_CONFLICT, detail="Логин уже занят")
+
     if data.email and data.email != target.email:
         if db.query(User).filter(User.email == data.email, User.id != user_id).first():
             raise HTTPException(status.HTTP_409_CONFLICT, detail="Email уже используется")
