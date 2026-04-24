@@ -262,6 +262,13 @@ class ApiService {
     return list.map((e) => EmployeeModel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getUsers() async {
+    final response = await dio.get('/users');
+    final data = response.data;
+    final list = data is Map ? (data['items'] as List? ?? []) : (data as List);
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
   Future<Map<String, dynamic>> createEmployee(Map<String, dynamic> data) async {
     final response = await dio.post('/users', data: data);
     return response.data;
@@ -816,4 +823,96 @@ class ApiService {
     final response = await dio.get('/attendance/today-status');
     return response.data as Map<String, dynamic>;
   }
+
+  // ── INTERN DIARY ────────────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getMyDiary() async {
+    final r = await dio.get('/intern/diary');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<Map<String, dynamic>> saveDiaryEntry(Map<String, dynamic> data) async {
+    final r = await dio.post('/intern/diary', data: data);
+    return r.data;
+  }
+
+  Future<List<Map<String, dynamic>>> getInternDiary(String internId) async {
+    final r = await dio.get('/intern/$internId/diary');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  // ── EVALUATIONS ─────────────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getInternEvaluations(String internId) async {
+    final r = await dio.get('/intern/$internId/evaluations');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<Map<String, dynamic>> createEvaluation(Map<String, dynamic> data) async {
+    final r = await dio.post('/intern/evaluations', data: data);
+    return r.data;
+  }
+
+  // ── MENTOR DASHBOARD ────────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getMyMentees() async {
+    final r = await dio.get('/mentor/mentees');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  // ── ROOMS ────────────────────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getRooms() async {
+    final r = await dio.get('/rooms');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getRoomBookings({String? date, String? roomId}) async {
+    final r = await dio.get('/rooms/bookings', queryParameters: {
+      if (date != null) 'booking_date': date,
+      if (roomId != null) 'room_id': roomId,
+    });
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<Map<String, dynamic>> createRoomBooking(Map<String, dynamic> data) async {
+    final r = await dio.post('/rooms/bookings', data: data);
+    return r.data;
+  }
+
+  Future<void> deleteRoomBooking(String bookingId) async {
+    await dio.delete('/rooms/bookings/$bookingId');
+  }
+
+  // ── KUDOS ────────────────────────────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getKudos({int skip = 0}) async {
+    final r = await dio.get('/kudos', queryParameters: {'skip': skip, 'limit': 20});
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<Map<String, dynamic>> sendKudos(String toUserId, String message, String emoji) async {
+    final r = await dio.post('/kudos', data: {
+      'to_user_id': toUserId,
+      'message': message,
+      'emoji': emoji,
+    });
+    return r.data;
+  }
+
+  // ── POINTS / REWARDS ────────────────────────────────────────────────────────
+  Future<int> getMyPoints() async {
+    final r = await dio.get('/points/me');
+    return r.data['total_points'] as int? ?? 0;
+  }
+
+  Future<List<Map<String, dynamic>>> getLeaderboard() async {
+    final r = await dio.get('/points/leaderboard');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getRewards() async {
+    final r = await dio.get('/rewards');
+    return List<Map<String, dynamic>>.from(r.data);
+  }
+
+  Future<void> claimReward(String rewardId) async {
+    await dio.post('/rewards/$rewardId/claim');
+  }
 }
+

@@ -20,6 +20,7 @@ from app.routers.news import router as news_router
 from app.routers.tasks import router as tasks_router
 from app.routers.employee_schedules import router as employee_schedules_router
 from app.routers.audit_logs import router as audit_logs_router
+from app.routers.extras import router as extras_router
 
 
 @asynccontextmanager
@@ -85,6 +86,7 @@ app.include_router(tasks_router, prefix=prefix)
 app.include_router(employee_schedules_router, prefix=prefix)
 app.include_router(audit_logs_router, prefix=prefix)
 app.include_router(settings_router, prefix=prefix)
+app.include_router(extras_router, prefix=prefix)
 
 # Serve uploaded files (avatars, etc.)
 _uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")

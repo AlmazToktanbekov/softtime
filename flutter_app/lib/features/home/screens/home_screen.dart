@@ -495,6 +495,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       onItem: (id) => context.push('/news/$id'),
                     ),
                   ),
+                  const SizedBox(height: 20),
+
+                  // ── Быстрые ссылки на новые фичи ─────────────────────────
+                  _AnimatedSection(
+                    fade: _sectionFades[5],
+                    slide: _sectionSlides[5],
+                    child: _FeatureLinksSection(user: user, onNavigate: context.go),
+                  ),
                 ]),
               ),
             ),
@@ -2359,4 +2367,149 @@ class _StatChip extends StatelessWidget {
 extension _Cap on String {
   String capitalize() =>
       isEmpty ? this : '${this[0].toUpperCase()}${substring(1)}';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE LINKS SECTION — Быстрый доступ к новым фичам
+// ══════════════════════════════════════════════════════════════════════════════
+class _FeatureLinksSection extends StatelessWidget {
+  final dynamic user;
+  final void Function(String) onNavigate;
+  const _FeatureLinksSection({this.user, required this.onNavigate});
+
+  @override
+  Widget build(BuildContext context) {
+    final role = user?.role ?? '';
+    final isIntern = role == 'INTERN';
+    final isTeamLead = role == 'TEAM_LEAD';
+
+    final List<_FeatureLink> links = [
+      // Для всех
+      _FeatureLink(
+        icon: Icons.favorite_rounded,
+        label: 'Кудосы',
+        subtitle: 'Благодарности коллегам',
+        color: const Color(0xFFFF6B35),
+        route: '/home/kudos',
+      ),
+      _FeatureLink(
+        icon: Icons.emoji_events_rounded,
+        label: 'Очки',
+        subtitle: 'Магазин призов',
+        color: const Color(0xFFFFB347),
+        route: '/home/rewards',
+      ),
+      _FeatureLink(
+        icon: Icons.meeting_room_rounded,
+        label: 'Переговорки',
+        subtitle: 'Бронирование',
+        color: const Color(0xFF4F46E5),
+        route: '/home/rooms',
+      ),
+      // Только для стажеров
+      if (isIntern)
+        _FeatureLink(
+          icon: Icons.trending_up_rounded,
+          label: 'Мой прогресс',
+          subtitle: 'Дневник и оценки',
+          color: const Color(0xFF10B981),
+          route: '/home/intern-progress',
+        ),
+      // Только для менторов
+      if (isTeamLead)
+        _FeatureLink(
+          icon: Icons.supervisor_account_rounded,
+          label: 'Подопечные',
+          subtitle: 'Панель ментора',
+          color: const Color(0xFF8B5CF6),
+          route: '/home/mentor-dashboard',
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Инструменты',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 2.4,
+          children: links.map((link) => GestureDetector(
+            onTap: () => onNavigate(link.route),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: link.color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: link.color.withOpacity(0.25)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: link.color.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(link.icon, color: link.color, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          link.label,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        Text(
+                          link.subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureLink {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final String route;
+  const _FeatureLink({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.route,
+  });
 }

@@ -17,6 +17,11 @@ import 'features/requests/screens/requests_screen.dart';
 import 'features/schedule/screens/schedule_screen.dart';
 import 'features/tasks/screens/tasks_screen.dart';
 import 'features/team/screens/team_screen.dart';
+import 'features/tasks/screens/intern_progress_screen.dart';
+import 'features/team/screens/mentor_dashboard_screen.dart';
+import 'features/team/screens/kudos_screen.dart';
+import 'features/team/screens/rewards_screen.dart';
+import 'features/team/screens/room_booking_screen.dart';
 
 // Admin
 import 'features/admin/admin_shell.dart';
@@ -223,6 +228,36 @@ final routerProvider = Provider<GoRouter>((ref) {
                 parentNavigatorKey: _rootNavigatorKey,
                 pageBuilder: (_, state) =>
                     _slideRoute(state, const TeamScreen()),
+              ),
+              GoRoute(
+                path: 'intern-progress',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const InternProgressScreen()),
+              ),
+              GoRoute(
+                path: 'mentor-dashboard',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const MentorDashboardScreen()),
+              ),
+              GoRoute(
+                path: 'kudos',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const KudosScreen()),
+              ),
+              GoRoute(
+                path: 'rewards',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const RewardsScreen()),
+              ),
+              GoRoute(
+                path: 'rooms',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const RoomBookingScreen()),
               ),
             ],
           ),

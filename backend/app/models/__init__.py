@@ -12,6 +12,12 @@ from app.models.employee_schedule import EmployeeSchedule
 from app.models.duty import DutyQueue, DutyAssignment, DutyChecklistItem, DutySwap, DutyType
 from app.models.news import News, NewsRead, NewsType
 from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.extras import (
+    InternDiary, InternEvaluation,
+    Room, RoomBooking,
+    Kudos,
+    UserPoints, PointTransaction, Reward, RewardClaim,
+)
 
 __all__ = [
     "Team",
@@ -26,4 +32,8 @@ __all__ = [
     "DutyQueue", "DutyAssignment", "DutyChecklistItem", "DutySwap", "DutyType",
     "News", "NewsRead", "NewsType",
     "Task", "TaskPriority", "TaskStatus",
+    "InternDiary", "InternEvaluation",
+    "Room", "RoomBooking",
+    "Kudos",
+    "UserPoints", "PointTransaction", "Reward", "RewardClaim",
 ]

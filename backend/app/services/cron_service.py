@@ -124,6 +124,72 @@ def check_incomplete_duties():
         db.close()
 
 
+def award_daily_attendance_points():
+    """
+    Каждый день в 18:30 начисляет 10 очков всем, кто сегодня был присутствующим или опоздал.
+    """
+    from app.database import SessionLocal
+    from app.models.attendance import Attendance, AttendanceStatus
+    from app.routers.extras import _add_points
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+        present = db.query(Attendance).filter(
+            Attendance.date == today,
+            Attendance.status.in_([AttendanceStatus.PRESENT]),
+        ).all()
+        for a in present:
+            _add_points(db, a.user_id, 10, f"Без опозданий {today}")
+        db.commit()
+        logger.info(f"[CRON 18:30] Начислено очков {len(present)} сотрудникам")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[CRON 18:30] Ошибка начисления очков: {e}")
+    finally:
+        db.close()
+
+
+def notify_mentors_about_late_interns():
+    """
+    В 10:00 проверяем кто из стажеров не отметился, уведомляем их менторов.
+    """
+    from app.database import SessionLocal
+    from app.models.attendance import Attendance
+    from app.models.user import User, UserRole, UserStatus
+    from app.utils.fcm import notify_user
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+        interns = db.query(User).filter(
+            User.role == UserRole.INTERN,
+            User.status == UserStatus.ACTIVE,
+            User.deleted_at.is_(None),
+            User.mentor_id.isnot(None),
+        ).all()
+
+        for intern in interns:
+            checked_in = db.query(Attendance).filter(
+                Attendance.user_id == intern.id,
+                Attendance.date == today,
+            ).first()
+            if not checked_in and intern.mentor_id:
+                mentor = db.query(User).filter(User.id == intern.mentor_id).first()
+                if mentor:
+                    notify_user(
+                        mentor,
+                        title="⚠️ Стажер не явился",
+                        body=f"{intern.full_name} ещё не отметился сегодня",
+                        data={"type": "intern_absent", "intern_id": str(intern.id)},
+                    )
+        logger.info(f"[CRON 10:00] Проверены стажеры")
+    except Exception as e:
+        logger.error(f"[CRON 10:00] Ошибка уведомлений менторов: {e}")
+    finally:
+        db.close()
+
+
 def setup_scheduler():
     """Создаёт и возвращает настроенный APScheduler."""
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -145,4 +211,21 @@ def setup_scheduler():
         id="duty_check_23",
         replace_existing=True,
     )
+    scheduler.add_job(
+        award_daily_attendance_points,
+        trigger="cron",
+        hour=18,
+        minute=30,
+        id="award_points_18_30",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        notify_mentors_about_late_interns,
+        trigger="cron",
+        hour=10,
+        minute=0,
+        id="mentor_notify_10",
+        replace_existing=True,
+    )
     return scheduler
+
