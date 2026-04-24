@@ -67,6 +67,7 @@ class UserModel {
 class EmployeeModel {
   final String id;
   final String fullName;
+  final String username;
   final String email;
   final String? phone;
   final String? teamName;
@@ -80,6 +81,7 @@ class EmployeeModel {
   EmployeeModel({
     required this.id,
     required this.fullName,
+    required this.username,
     required this.email,
     this.phone,
     this.teamName,
@@ -94,6 +96,7 @@ class EmployeeModel {
   factory EmployeeModel.fromJson(Map<String, dynamic> json) => EmployeeModel(
         id: json['id'].toString(),
         fullName: json['full_name'] as String,
+        username: json['username'] as String? ?? '',
         email: json['email'] as String,
         phone: json['phone']?.toString(),
         teamName: json['team_name']?.toString(),

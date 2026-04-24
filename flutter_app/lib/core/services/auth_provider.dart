@@ -116,6 +116,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         : EmployeeModel(
             id: emp.id,
             fullName: emp.fullName,
+            username: emp.username,
             email: emp.email,
             phone: emp.phone,
             teamName: emp.teamName,

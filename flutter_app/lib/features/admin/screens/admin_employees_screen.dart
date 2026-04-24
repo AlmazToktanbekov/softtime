@@ -242,6 +242,68 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
         resolvedAvatarUrl: resolvedUrl,
         onStatusChange: (status) => _updateStatus(emp.id, status),
         onRoleChange: (role) => _updateRole(emp.id, role),
+        onEditProfile: () {
+          Navigator.pop(context);
+          _editEmployee(emp);
+        },
+      ),
+    );
+  }
+
+  void _editEmployee(EmployeeModel emp) {
+    final nameCtrl = TextEditingController(text: emp.fullName);
+    final loginCtrl = TextEditingController(text: emp.username);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Редактировать профиль', style: TextStyle(fontFamily: 'Inter')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Полное имя'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: loginCtrl,
+              decoration: const InputDecoration(labelText: 'Логин'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () async {
+              try {
+                await ref.read(apiServiceProvider).updateEmployee(emp.id, {
+                  if (nameCtrl.text.isNotEmpty && nameCtrl.text != emp.fullName) 'full_name': nameCtrl.text,
+                  if (loginCtrl.text.isNotEmpty && loginCtrl.text != emp.username) 'username': loginCtrl.text,
+                });
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  _load();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Профиль обновлен'), backgroundColor: AppColors.success),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
+            },
+            child: const Text('Сохранить', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }
@@ -525,12 +587,14 @@ class _EmployeeDetailSheet extends StatelessWidget {
   final String? resolvedAvatarUrl;
   final void Function(String) onStatusChange;
   final void Function(String) onRoleChange;
+  final VoidCallback onEditProfile;
 
   const _EmployeeDetailSheet({
     required this.emp,
     this.resolvedAvatarUrl,
     required this.onStatusChange,
     required this.onRoleChange,
+    required this.onEditProfile,
   });
 
   @override
@@ -647,6 +711,13 @@ class _EmployeeDetailSheet extends StatelessWidget {
               Navigator.pop(context);
               onStatusChange('WARNING');
             },
+          ),
+          _actionTile(
+            context,
+            icon: Icons.edit_rounded,
+            iconColor: AppColors.primary,
+            label: 'Редактировать профиль',
+            onTap: onEditProfile,
           ),
           const SizedBox(height: 16),
         ],
