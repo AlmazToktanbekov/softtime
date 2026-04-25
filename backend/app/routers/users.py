@@ -208,6 +208,7 @@ def update_user(
         if not mentor:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ментор не найден")
 
+    old_status = target.status
     old_snapshot = _serialise(target)
 
     patch = data.model_dump(exclude_unset=True)
@@ -226,6 +227,16 @@ def update_user(
     )
     db.commit()
     db.refresh(target)
+
+    # Если статус изменился с PENDING на ACTIVE — уведомляем пользователя
+    if old_status == UserStatus.PENDING and target.status == UserStatus.ACTIVE:
+        notify_user(
+            target,
+            title="Аккаунт активирован",
+            body="Ваш аккаунт активирован администратором. Добро пожаловать!",
+            data={"type": "account_activated"},
+        )
+
     return UserDetail.model_validate(target)
 
 

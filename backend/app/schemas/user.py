@@ -83,6 +83,7 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[UserRole] = None
+    status: Optional[UserStatus] = None
     team_name: Optional[str] = None
     team_id: Optional[UUID] = None
     mentor_id: Optional[UUID] = None
