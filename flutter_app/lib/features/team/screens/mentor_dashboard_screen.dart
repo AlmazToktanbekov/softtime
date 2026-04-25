@@ -68,6 +68,7 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
                           mentee: _mentees[i],
                           onEvaluate: () => _showEvaluateDialog(_mentees[i]),
                           onViewDiary: () => _showDiary(_mentees[i]),
+                          onViewEvaluations: () => _showEvaluations(_mentees[i]),
                         ),
                       ),
                     ),
@@ -189,14 +190,40 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
       ),
     );
   }
+
+  void _showEvaluations(Map<String, dynamic> mentee) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.8,
+        builder: (ctx, scroll) => _InternEvaluationsView(
+          internId: mentee['id'],
+          internName: mentee['full_name'],
+          scroll: scroll,
+        ),
+      ),
+    );
+  }
 }
 
 class _MenteeCard extends StatelessWidget {
   final Map<String, dynamic> mentee;
   final VoidCallback onEvaluate;
   final VoidCallback onViewDiary;
+  final VoidCallback onViewEvaluations;
 
-  const _MenteeCard({required this.mentee, required this.onEvaluate, required this.onViewDiary});
+  const _MenteeCard({
+    required this.mentee,
+    required this.onEvaluate,
+    required this.onViewDiary,
+    required this.onViewEvaluations,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -292,9 +319,22 @@ class _MenteeCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onViewEvaluations,
+                  icon: const Icon(Icons.star_outline, size: 16),
+                  label: const Text('Оценки', style: TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.divider),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
                 child: ElevatedButton.icon(
                   onPressed: onEvaluate,
-                  icon: const Icon(Icons.star_outline, size: 16, color: Colors.white),
+                  icon: const Icon(Icons.add, size: 16, color: Colors.white),
                   label: const Text('Оценить', style: TextStyle(fontSize: 13, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -307,6 +347,94 @@ class _MenteeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InternEvaluationsView extends StatefulWidget {
+  final String internId;
+  final String internName;
+  final ScrollController scroll;
+  const _InternEvaluationsView({required this.internId, required this.internName, required this.scroll});
+
+  @override
+  State<_InternEvaluationsView> createState() => _InternEvaluationsViewState();
+}
+
+class _InternEvaluationsViewState extends State<_InternEvaluationsView> {
+  List<Map<String, dynamic>> _evals = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = await ApiService().getInternEvaluations(widget.internId);
+      setState(() { _evals = d; _loading = false; });
+    } catch (_) {
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text('📊 Оценки: ${widget.internName}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        ),
+        if (_loading)
+          const Expanded(child: Center(child: CircularProgressIndicator()))
+        else if (_evals.isEmpty)
+          const Expanded(child: Center(child: Text('Оценок пока нет')))
+        else
+          Expanded(
+            child: ListView.builder(
+              controller: widget.scroll,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _evals.length,
+              itemBuilder: (ctx, i) {
+                final e = _evals[i];
+                final m = e['motivation_score'] as int? ?? 0;
+                final k = e['knowledge_score'] as int? ?? 0;
+                final c = e['communication_score'] as int? ?? 0;
+                final avg = (m + k + c) / 3;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e['eval_period'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+                          Text('${avg.toStringAsFixed(1)}/5', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Мотивация: $m, Знания: $k, Общение: $c', style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+                      if (e['comment'] != null) ...[
+                        const SizedBox(height: 4),
+                        Text('"${e['comment']}"', style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 }

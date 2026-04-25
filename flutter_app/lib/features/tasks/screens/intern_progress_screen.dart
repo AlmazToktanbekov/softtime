@@ -36,17 +36,28 @@ class _InternProgressScreenState extends ConsumerState<InternProgressScreen>
     setState(() { _loading = true; _error = null; });
     try {
       final user = ref.read(authProvider).user;
-      final results = await Future.wait([
-        ApiService().getMyDiary(),
-        if (user != null) ApiService().getInternEvaluations(user.id),
-      ]);
-      setState(() {
-        _diary = results[0];
-        _evaluations = results.length > 1 ? results[1] : [];
-        _loading = false;
-      });
+      
+      // Load diary
+      try {
+        final diary = await ApiService().getMyDiary();
+        if (mounted) setState(() => _diary = diary);
+      } catch (e) {
+        debugPrint('Error loading diary: $e');
+      }
+
+      // Load evaluations
+      if (user != null) {
+        try {
+          final evals = await ApiService().getInternEvaluations(user.id);
+          if (mounted) setState(() => _evaluations = evals);
+        } catch (e) {
+          debugPrint('Error loading evaluations: $e');
+        }
+      }
+      
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
