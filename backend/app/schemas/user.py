@@ -55,12 +55,14 @@ class UserBase(BaseModel):
 
 class UserListItem(UserBase):
     mentor_id: Optional[UUID]
+    mentor_full_name: Optional[str] = None
 
 
 # ── Detail (full profile) ─────────────────────────────────────────────────────
 
 class UserDetail(UserBase):
     mentor_id: Optional[UUID]
+    mentor_full_name: Optional[str] = None
     admin_comment: Optional[str]
     fcm_token: Optional[str]
     updated_at: Optional[datetime]

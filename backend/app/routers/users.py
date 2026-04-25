@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.audit_log import AuditLog
@@ -112,7 +112,7 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_teamlead),
 ):
-    q = _base_query(db)
+    q = _base_query(db).options(joinedload(User.mentor))
 
     # TEAM_LEAD sees only their mentees
     if current_user.role == UserRole.TEAM_LEAD:
@@ -123,8 +123,14 @@ def list_users(
     total = q.count()
     items = q.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit).all()
 
+    items_processed = []
+    for u in items:
+        m = UserListItem.model_validate(u)
+        m.mentor_full_name = u.mentor.full_name if u.mentor else None
+        items_processed.append(m)
+
     return PaginatedUsers(
-        items=[UserListItem.model_validate(u) for u in items],
+        items=items_processed,
         total=total,
         page=page,
         limit=limit,
@@ -140,12 +146,18 @@ def list_pending(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    q = _base_query(db).filter(User.status == UserStatus.PENDING)
+    q = _base_query(db).filter(User.status == UserStatus.PENDING).options(joinedload(User.mentor))
     total = q.count()
     items = q.order_by(User.created_at.asc()).offset((page - 1) * limit).limit(limit).all()
 
+    items_processed = []
+    for u in items:
+        m = UserListItem.model_validate(u)
+        m.mentor_full_name = u.mentor.full_name if u.mentor else None
+        items_processed.append(m)
+
     return PaginatedUsers(
-        items=[UserListItem.model_validate(u) for u in items],
+        items=items_processed,
         total=total,
         page=page,
         limit=limit,
@@ -160,7 +172,9 @@ def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    target = _get_user_or_404(db, user_id)
+    target = _base_query(db).options(joinedload(User.mentor)).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
 
     is_admin = current_user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
     is_teamlead_of = (
@@ -172,7 +186,9 @@ def get_user(
     if not (is_admin or is_teamlead_of or is_self):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Нет доступа к этому профилю")
 
-    return UserDetail.model_validate(target)
+    res = UserDetail.model_validate(target)
+    res.mentor_full_name = target.mentor.full_name if target.mentor else None
+    return res
 
 
 # ── PUT /users/{user_id} ───────────────────────────────────────────────────────
@@ -237,7 +253,9 @@ def update_user(
             data={"type": "account_activated"},
         )
 
-    return UserDetail.model_validate(target)
+    res = UserDetail.model_validate(target)
+    res.mentor_full_name = target.mentor.full_name if target.mentor else None
+    return res
 
 
 # ── PATCH /users/{user_id}/status ─────────────────────────────────────────────
