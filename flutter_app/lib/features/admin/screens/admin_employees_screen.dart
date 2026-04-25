@@ -206,6 +206,13 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
   }
 
   Future<void> _updateStatus(String id, String status) async {
+    if (status == 'ACTIVE') {
+      final emp = _all.firstWhere((e) => e.id == id);
+      if (emp.status == 'PENDING') {
+        _showApproveDialog(emp);
+        return;
+      }
+    }
     try {
       await ref
           .read(apiServiceProvider)
@@ -227,6 +234,88 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
         );
       }
     }
+  }
+
+  void _showApproveDialog(EmployeeModel emp) async {
+    String selectedRole = emp.role;
+    String? selectedMentorId = emp.mentorId;
+    final commentCtrl = TextEditingController();
+    final mentors = await ref.read(apiServiceProvider).getUsers();
+    final mentorList = mentors.where((m) => ['TEAM_LEAD', 'ADMIN', 'SUPER_ADMIN'].contains(m['role'])).toList();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text('Подтвердить: ${emp.fullName}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(labelText: 'Роль'),
+                  items: ['EMPLOYEE', 'INTERN', 'TEAM_LEAD'].map((r) => DropdownMenuItem(
+                    value: r,
+                    child: Text(r == 'EMPLOYEE' ? 'Сотрудник' : r == 'INTERN' ? 'Стажёр' : 'Ментор'),
+                  )).toList(),
+                  onChanged: (v) => setDialogState(() => selectedRole = v!),
+                ),
+                const SizedBox(height: 16),
+                if (selectedRole == 'INTERN') ...[
+                  DropdownButtonFormField<String>(
+                    value: selectedMentorId,
+                    decoration: const InputDecoration(labelText: 'Ментор (обязательно)'),
+                    hint: const Text('Выберите ментора'),
+                    items: mentorList.map((m) => DropdownMenuItem(
+                      value: m['id'].toString(),
+                      child: Text(m['full_name']),
+                    )).toList(),
+                    onChanged: (v) => setDialogState(() => selectedMentorId = v),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                TextField(
+                  controller: commentCtrl,
+                  decoration: const InputDecoration(labelText: 'Комментарий (опционально)'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              onPressed: () async {
+                if (selectedRole == 'INTERN' && selectedMentorId == null) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Выберите ментора для стажёра')));
+                  return;
+                }
+                try {
+                  await ref.read(apiServiceProvider).approveEmployee(
+                    emp.id,
+                    role: selectedRole,
+                    mentorId: selectedMentorId,
+                    comment: commentCtrl.text,
+                  );
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _load();
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Сотрудник успешно подтверждён'), backgroundColor: AppColors.success));
+                  }
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+                }
+              },
+              child: const Text('Подтвердить', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEmployeeDetail(EmployeeModel emp) {
@@ -483,6 +572,24 @@ class _EmployeeCard extends StatelessWidget {
                           ],
                         ],
                       ),
+                      if (emp.role == 'INTERN' && emp.mentorFullName != null) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.school_outlined, size: 12, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Ментор: ${emp.mentorFullName}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -689,6 +796,40 @@ class _EmployeeDetailSheet extends StatelessWidget {
               ],
             ),
           ),
+          if (emp.role == 'INTERN' && emp.mentorFullName != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.school_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Назначенный ментор:',
+                        style: TextStyle(fontSize: 11, color: AppColors.primaryDark),
+                      ),
+                      Text(
+                        emp.mentorFullName!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           const Divider(height: 1, indent: 20, endIndent: 20),
           const SizedBox(height: 12),

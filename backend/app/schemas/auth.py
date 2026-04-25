@@ -104,6 +104,7 @@ class UserMeResponse(BaseModel):
     team_name: Optional[str]
     team_id: Optional[UUID]
     mentor_id: Optional[UUID]
+    mentor_full_name: Optional[str] = None
     avatar_url: Optional[str]
     hired_at: Optional[date]
     created_at: datetime

@@ -92,3 +92,7 @@ class User(Base):
     @property
     def is_admin(self) -> bool:
         return self.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)
+
+    @property
+    def mentor_full_name(self) -> Optional[str]:
+        return self.mentor.full_name if self.mentor else None

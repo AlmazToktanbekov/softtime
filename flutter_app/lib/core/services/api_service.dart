@@ -279,6 +279,14 @@ class ApiService {
     return response.data;
   }
 
+  Future<void> approveEmployee(String id, {required String role, String? mentorId, String? comment}) async {
+    await dio.patch('/users/$id/approve', data: {
+      'role': role,
+      'mentor_id': mentorId,
+      'comment': comment,
+    });
+  }
+
   Future<void> deactivateEmployee(String id) async {
     await dio.patch('/users/$id/deactivate');
   }

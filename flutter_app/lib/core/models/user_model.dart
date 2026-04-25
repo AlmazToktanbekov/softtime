@@ -9,6 +9,7 @@ class UserModel {
   final String? teamName;
   final String? teamId;
   final String? mentorId;
+  final String? mentorFullName;
   final String? avatarUrl;
   final String? hiredAt;
 
@@ -23,6 +24,7 @@ class UserModel {
     this.teamName,
     this.teamId,
     this.mentorId,
+    this.mentorFullName,
     this.avatarUrl,
     this.hiredAt,
   });
@@ -38,6 +40,7 @@ class UserModel {
         teamName: json['team_name']?.toString(),
         teamId: json['team_id']?.toString(),
         mentorId: json['mentor_id']?.toString(),
+        mentorFullName: json['mentor_full_name']?.toString(),
         avatarUrl: json['avatar_url']?.toString(),
         hiredAt: json['hired_at']?.toString(),
       );
@@ -73,6 +76,7 @@ class EmployeeModel {
   final String? teamName;
   final String? teamId;
   final String? mentorId;
+  final String? mentorFullName;
   final String? avatarUrl;
   final String? hireDate;
   final String status;
@@ -87,6 +91,7 @@ class EmployeeModel {
     this.teamName,
     this.teamId,
     this.mentorId,
+    this.mentorFullName,
     this.avatarUrl,
     this.hireDate,
     required this.status,
@@ -102,6 +107,7 @@ class EmployeeModel {
         teamName: json['team_name']?.toString(),
         teamId: json['team_id']?.toString(),
         mentorId: json['mentor_id']?.toString(),
+        mentorFullName: json['mentor_full_name']?.toString(),
         avatarUrl: json['avatar_url']?.toString(),
         hireDate: json['hired_at']?.toString(),
         status: json['status'].toString(),
