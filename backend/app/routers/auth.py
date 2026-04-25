@@ -40,13 +40,9 @@ _MENTOR_ROLES = (UserRole.TEAM_LEAD, UserRole.ADMIN, UserRole.SUPER_ADMIN)
 
 @router.get("/register/mentors")
 def list_register_mentors(
-    x_app_key: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    """Список менторов для регистрации стажёра. Требует заголовок X-App-Key."""
-    from app.config import settings
-    if not x_app_key or x_app_key != settings.APP_REGISTRATION_KEY:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Нет доступа")
+    """Список менторов для регистрации стажёра. Публичный доступ."""
     users = (
         db.query(User)
         .filter(
