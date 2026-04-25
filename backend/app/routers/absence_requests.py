@@ -171,7 +171,7 @@ def list_my_absence_requests(
 
 @router.get("", response_model=List[AbsenceRequestResponse])
 def list_absence_requests(
-    status: Optional[AbsenceRequestStatus] = Query(default=None),
+    status: Optional[str] = Query(default=None),
     user_id: Optional[UUID] = Query(default=None),
     request_type: Optional[AbsenceRequestType] = Query(default=None),
     db: Session = Depends(get_db),
@@ -179,7 +179,16 @@ def list_absence_requests(
 ):
     q = db.query(AbsenceRequest).options(joinedload(AbsenceRequest.user))
     if status is not None:
-        q = q.filter(AbsenceRequest.status == status)
+        if status.upper() == "PENDING":
+            q = q.filter(AbsenceRequest.status == AbsenceRequestStatus.new)
+        else:
+            try:
+                # Пытаемся преобразовать строку в Enum
+                enum_status = AbsenceRequestStatus(status.lower())
+                q = q.filter(AbsenceRequest.status == enum_status)
+            except ValueError:
+                # Если статус неизвестен, просто не фильтруем по нему (или можно выдать ошибку)
+                pass
     if user_id is not None:
         q = q.filter(AbsenceRequest.user_id == user_id)
     if request_type is not None:
