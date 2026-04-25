@@ -1,17 +1,15 @@
-import os
 import secrets
-
 from sqlalchemy.orm import Session
-
+from app.config import settings
 from app.models.user import User, UserRole, UserStatus
 from app.models.office_network import OfficeNetwork, QRToken
 from app.utils.security import get_password_hash
 
-# Credentials читаются из .env — никогда не хардкодятся в коде
-_ADMIN_USERNAME = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
-_ADMIN_EMAIL = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@softjol.com")
-_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "changeme_in_production")
-_ADMIN_PHONE = os.getenv("DEFAULT_ADMIN_PHONE", "+99600000000")
+# Credentials читаются из Settings (которые уже загрузили .env)
+_ADMIN_USERNAME = settings.DEFAULT_ADMIN_USERNAME
+_ADMIN_EMAIL = settings.DEFAULT_ADMIN_EMAIL
+_ADMIN_PASSWORD = settings.DEFAULT_ADMIN_PASSWORD
+_ADMIN_PHONE = settings.DEFAULT_ADMIN_PHONE
 
 
 def ensure_default_data(db: Session) -> None:

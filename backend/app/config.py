@@ -40,7 +40,21 @@ class Settings(BaseSettings):
     # Auto-create tables on startup — отключено, используется Alembic
     AUTO_CREATE_TABLES: bool = False
 
-    model_config = ConfigDict(env_file=".env", case_sensitive=True)
+    # Database variables for Docker compatibility
+    POSTGRES_DB: str = "softtime_db"
+    POSTGRES_USER: str = "softtime"
+    POSTGRES_PASSWORD: str = "softtime123"
+
+    # Firebase legacy (not used by admin sdk but present in .env)
+    FCM_SERVER_KEY: str = ""
+
+    # Admin defaults
+    DEFAULT_ADMIN_USERNAME: str = "admin"
+    DEFAULT_ADMIN_EMAIL: str = "admin@softjol.com"
+    DEFAULT_ADMIN_PASSWORD: str = "admin123"
+    DEFAULT_ADMIN_PHONE: str = "+99600000000"
+
+    model_config = ConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 
 settings = Settings()
