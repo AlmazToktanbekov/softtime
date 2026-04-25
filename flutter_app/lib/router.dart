@@ -22,6 +22,7 @@ import 'features/team/screens/mentor_dashboard_screen.dart';
 import 'features/team/screens/kudos_screen.dart';
 import 'features/team/screens/rewards_screen.dart';
 import 'features/team/screens/room_booking_screen.dart';
+import 'features/team/screens/team_calendar_screen.dart';
 
 // Admin
 import 'features/admin/admin_shell.dart';
@@ -258,6 +259,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 parentNavigatorKey: _rootNavigatorKey,
                 pageBuilder: (_, state) =>
                     _slideRoute(state, const RoomBookingScreen()),
+              ),
+              GoRoute(
+                path: 'team-calendar',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const TeamCalendarScreen()),
               ),
             ],
           ),

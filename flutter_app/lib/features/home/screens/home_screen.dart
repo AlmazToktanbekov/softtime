@@ -2386,6 +2386,13 @@ class _FeatureLinksSection extends StatelessWidget {
     final List<_FeatureLink> links = [
       // Для всех
       _FeatureLink(
+        icon: Icons.calendar_month_rounded,
+        label: 'Календарь',
+        subtitle: 'Кто в офисе',
+        color: const Color(0xFF3B82F6),
+        route: '/home/team-calendar',
+      ),
+      _FeatureLink(
         icon: Icons.favorite_rounded,
         label: 'Кудосы',
         subtitle: 'Благодарности коллегам',

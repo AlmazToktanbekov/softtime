@@ -146,6 +146,11 @@ def check_in(
         log_action(current_user.id, "check_in", "failure", message, ip_address, db)
         raise HTTPException(status_code=400, detail=message)
 
+    # Геймификация: +10 очков за приход в офис
+    from app.routers.extras import _add_points
+    _add_points(db, current_user.id, 10, "Посещение офиса")
+    db.commit()
+
     return _serialize(attendance, db)
 
 
