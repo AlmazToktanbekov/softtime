@@ -188,11 +188,14 @@ class _KudosCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(8),
-              fontStyle: FontStyle.italic,
             ),
             child: Text(
               '"${kudo['message']}"',
-              style: TextStyle(color: AppColors.textMain, height: 1.4),
+              style: const TextStyle(
+                color: AppColors.textPrimary, 
+                height: 1.4,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
           const SizedBox(height: 8),

@@ -29,8 +29,6 @@ async def lifespan(app: FastAPI):
     if settings.AUTO_CREATE_TABLES:
         Base.metadata.create_all(bind=engine)
 
-    from app.database import ensure_users_team_schema
-    ensure_users_team_schema(engine)
 
     from app.database import SessionLocal
     from app.bootstrap import ensure_default_data
