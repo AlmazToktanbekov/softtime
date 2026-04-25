@@ -454,6 +454,9 @@ function renderEmployees(list) {
     return;
   }
 
+  // Сортировка по алфавиту
+  list.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
   const roleLabels = { SUPER_ADMIN:'Супер Админ', ADMIN:'Админ', TEAM_LEAD:'Тимлид', EMPLOYEE:'Сотрудник', INTERN:'Стажёр' };
   const statusLabels = { ACTIVE:'Активен', BLOCKED:'Заблокирован', LEAVE:'В отпуске', WARNING:'Предупреждение', DELETED:'Удалён' };
   const mediaBase = API.replace(/\/api\/v1\/?$/, '');
@@ -552,7 +555,7 @@ async function openEmployeeProfile(userId) {
           </div>
           <div id="empProfileNameDisplay" style="font-size:18px;font-weight:800;color:var(--text)">${emp.full_name || '—'}</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           ${fields.map(([label, value]) => `
             <div style="background:var(--bg);border-radius:10px;padding:10px">
               <div style="font-size:11px;color:var(--text-sub);margin-bottom:3px">${label}</div>
@@ -562,10 +565,30 @@ async function openEmployeeProfile(userId) {
         </div>
 
         <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">✏️ Изменить ФИО</div>
-          <input id="empEditNameInput" class="form-input" style="margin-bottom:10px" placeholder="Иванов Иван Иванович" value="${(emp.full_name||'').replace(/"/g,'&quot;')}">
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-primary" onclick="saveEmployeeName('${emp.id}')">Сохранить</button>
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text)">✏️ Редактирование</div>
+          
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px">ФИО *</label>
+            <input id="empEditFullName" class="form-input" value="${escHtml(emp.full_name || '')}">
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px">Логин *</label>
+            <input id="empEditUsername" class="form-input" value="${escHtml(emp.username || '')}">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px">Телефон</label>
+            <input id="empEditPhone" class="form-input" value="${escHtml(emp.phone || '')}" placeholder="+996...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px">Команда/отдел</label>
+            <input id="empEditTeam" class="form-input" value="${escHtml(emp.team_name || '')}">
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}')" style="width:100%">Сохранить изменения</button>
           </div>
         </div>
       </div>
@@ -575,21 +598,37 @@ async function openEmployeeProfile(userId) {
   document.body.appendChild(modal);
 }
 
-async function saveEmployeeName(userId) {
-  const input = document.getElementById('empEditNameInput');
-  const newName = input.value.trim();
-  if (!newName) { showToast('Введите ФИО', 'error'); return; }
+async function saveEmployeeDetails(userId) {
+  const fullName = document.getElementById('empEditFullName').value.trim();
+  const username = document.getElementById('empEditUsername').value.trim();
+  const phone = document.getElementById('empEditPhone').value.trim();
+  const team_name = document.getElementById('empEditTeam').value.trim();
+
+  // Валидация
+  if (!fullName) return showToast('Введите ФИО', 'error');
+  if (username.length < 3) return showToast('Логин должен быть не менее 3 символов', 'error');
+  if (!/^[a-zA-Z0-9._]+$/.test(username)) return showToast('Логин может содержать только латиницу, цифры, точки и подчеркивания', 'error');
+  if (phone && !/^\+?[0-9]{9,15}$/.test(phone)) return showToast('Неверный формат телефона', 'error');
+
   try {
+    const payload = { 
+      full_name: fullName, 
+      username: username,
+      phone: phone || null,
+      team_name: team_name || null
+    };
     const updated = await apiFetch(`/users/${userId}`, {
       method: 'PUT',
-      body: JSON.stringify({ full_name: newName }),
+      body: JSON.stringify(payload),
     });
-    document.getElementById('empProfileNameDisplay').textContent = updated.full_name;
-    document.getElementById('empEditNameForm').style.display = 'none';
-    const emp = allEmployees.find(e => e.id === userId);
-    if (emp) emp.full_name = updated.full_name;
+    
+    // Обновляем в локальном кэше
+    const idx = allEmployees.findIndex(e => e.id === userId);
+    if (idx !== -1) allEmployees[idx] = { ...allEmployees[idx], ...updated };
+    
     filterEmployees();
-    showToast('ФИО обновлено', 'success');
+    showToast('Данные обновлены', 'success');
+    document.getElementById('empProfileModal').remove();
   } catch(e) {
     showToast('Ошибка: ' + e.message, 'error');
   }
@@ -631,7 +670,7 @@ async function uploadEmployeeAvatar(userId, input) {
 }
 
 function filterEmployees() {
-  const search = document.getElementById('empSearch').value.toLowerCase();
+  const search = document.getElementById('globalSearch').value.toLowerCase();
   const dept = document.getElementById('empDeptFilter').value.toLowerCase();
   const role = document.getElementById('empRoleFilter').value;
   const showInactive = document.getElementById('showInactiveEmployees')?.checked;
@@ -735,14 +774,28 @@ async function loadPendingBadge() {
 }
 
 async function createEmployee() {
+  const fullName = document.getElementById('empFullName').value.trim();
+  const email = document.getElementById('empEmail').value.trim();
+  const username = document.getElementById('empUsername').value.trim();
+  const password = document.getElementById('empPassword').value;
+  const phone = document.getElementById('empPhone').value.trim();
+
+  // Валидация
+  if (!fullName) return showToast('Введите ФИО', 'error');
+  if (!email || !email.includes('@')) return showToast('Введите корректный Email', 'error');
+  if (username.length < 3) return showToast('Логин должен быть не менее 3 символов', 'error');
+  if (!/^[a-zA-Z0-9._]+$/.test(username)) return showToast('Логин может содержать только латиницу, цифры, точки и подчеркивания', 'error');
+  if (password.length < 6) return showToast('Пароль должен быть не менее 6 символов', 'error');
+  if (phone && !/^\+?[0-9]{9,15}$/.test(phone)) return showToast('Неверный формат телефона', 'error');
+
   try {
     await apiFetch('/users', {method:'POST', body: JSON.stringify({
-      full_name: document.getElementById('empFullName').value,
-      email: document.getElementById('empEmail').value,
-      phone: document.getElementById('empPhone').value || null,
+      full_name: fullName,
+      email: email,
+      phone: phone || null,
       team_name: document.getElementById('empDept').value || null,
-      username: document.getElementById('empUsername').value,
-      password: document.getElementById('empPassword').value,
+      username: username,
+      password: password,
     })});
     closeModal('addEmployee');
     showToast('Сотрудник создан', 'success');
@@ -2020,6 +2073,13 @@ function formatAuditDetail(val) {
 // ── Global search (filters visible table rows by name) ───────────────────────
 function handleGlobalSearch(query) {
   const q = query.toLowerCase().trim();
+  
+  // Если мы на странице сотрудников, вызываем специальный фильтр
+  if (document.getElementById('page-employees').classList.contains('active')) {
+    filterEmployees();
+    return;
+  }
+
   document.querySelectorAll('tbody tr').forEach(row => {
     row.style.display = q && !row.textContent.toLowerCase().includes(q) ? 'none' : '';
   });

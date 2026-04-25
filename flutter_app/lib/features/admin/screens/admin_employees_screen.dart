@@ -45,6 +45,8 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
         _all = emps
             .where((e) => !['ADMIN', 'SUPER_ADMIN'].contains(e.role))
             .toList();
+        // Сортировка по алфавиту по умолчанию
+        _all.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
         _loading = false;
       });
     } catch (_) {
@@ -334,6 +336,10 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
         onEditProfile: () {
           Navigator.pop(context);
           _editEmployee(emp);
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          _confirmDelete(emp);
         },
       ),
     );
