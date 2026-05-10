@@ -32,6 +32,7 @@ from app.utils.security import (
     token_ttl_seconds,
     verify_password,
 )
+from app.utils.audit import write_audit
 
 router = APIRouter(prefix="/auth", tags=["Аутентификация"])
 
@@ -161,6 +162,21 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     if not user or not verify_password(data.password, user.password_hash):
         count = record_failed_attempt(username_key, ip=client_ip)
+        
+        # Логируем неудачную попытку входа
+        try:
+            write_audit(
+                db,
+                actor_id=user.id if user else None,
+                action="LOGIN_FAILED",
+                entity="Auth",
+                new_value={"username": data.username, "ip": client_ip},
+                request=request
+            )
+            db.commit()
+        except:
+            pass
+
         remaining = max(0, 5 - count)
         detail = "Неверный логин или пароль."
         if remaining > 0:
@@ -180,6 +196,17 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     # Success — clear brute-force counter
     clear_failed_attempts(username_key)
+
+    # Логируем успешный вход
+    write_audit(
+        db,
+        actor_id=user.id,
+        action="LOGIN_SUCCESS",
+        entity="Auth",
+        new_value={"username": user.username, "ip": client_ip},
+        request=request
+    )
+    db.commit()
 
     user_id = str(user.id)
     role = user.role.value

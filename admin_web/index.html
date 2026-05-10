@@ -88,13 +88,17 @@
     </div>
   </div>
 </nav>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
 <!-- Main Content -->
 <div class="main">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-title" id="pageTitle">Дашборд</div>
-      <div class="topbar-date" id="topbarDate"></div>
+      <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Открыть меню">☰</button>
+      <div>
+        <div class="topbar-title" id="pageTitle">Дашборд</div>
+        <div class="topbar-date" id="topbarDate"></div>
+      </div>
     </div>
     <div class="topbar-actions">
       <div class="topbar-search">

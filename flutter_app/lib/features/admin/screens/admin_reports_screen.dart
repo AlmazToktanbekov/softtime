@@ -951,12 +951,12 @@ class _WeeklyLineChart extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           // Легенда
-          Row(
+          const Row(
             children: [
               _LegendDot(color: AppColors.success, label: 'Пришли'),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               _LegendDot(color: AppColors.warning, label: 'Опоздали'),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               _LegendDot(color: AppColors.error, label: 'Отсутствие'),
             ],
           ),

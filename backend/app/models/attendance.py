@@ -57,6 +57,10 @@ class Attendance(Base):
     is_manual = Column(Boolean, default=False)        # True if admin manually added/edited
     manual_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
+    # Дневной отчёт — сотрудник пишет при уходе (check-out)
+    daily_report = Column(String(2000), nullable=True)
+    daily_report_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

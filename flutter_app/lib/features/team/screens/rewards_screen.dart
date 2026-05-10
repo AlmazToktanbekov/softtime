@@ -125,9 +125,9 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
 
   Widget _buildRewardsGrid() {
     if (_rewards.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(20),
           child: Text('Призов пока нет', style: TextStyle(color: AppColors.textHint)),
         ),
       );

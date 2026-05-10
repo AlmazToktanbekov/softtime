@@ -683,3 +683,28 @@ def upload_avatar(
     db.commit()
 
     return AvatarResponse(avatar_url=avatar_url)
+
+
+# ── PATCH /users/{user_id}/fcm-token ──────────────────────────────────────────
+
+@router.patch("/{user_id}/fcm-token", response_model=dict)
+def update_fcm_token(
+    user_id: uuid.UUID,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Обновить FCM токен пользователя для push-уведомлений."""
+    # Пользователь может обновлять только свой токен
+    if current_user.id != user_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Можно обновлять только свой токен")
+
+    target = _get_user_or_404(db, user_id)
+    fcm_token = payload.get("fcm_token", "")
+    if not fcm_token:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="fcm_token не указан")
+
+    target.fcm_token = fcm_token
+    db.commit()
+
+    return {"success": True, "message": "FCM токен обновлён"}

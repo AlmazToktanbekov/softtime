@@ -125,7 +125,7 @@ class _MenteeCard extends StatelessWidget {
                           ? NetworkImage(ApiService().mediaAbsoluteUrl(mentee['avatar_url']))
                           : null,
                       child: mentee['avatar_url'] == null
-                          ? Text(mentee['full_name'][0], style: TextStyle(color: AppColors.primary, fontSize: 20, fontWeight: FontWeight.bold))
+                          ? Text(mentee['full_name'][0], style: const TextStyle(color: AppColors.primary, fontSize: 20, fontWeight: FontWeight.bold))
                           : null,
                     ),
                     const SizedBox(width: 16),
@@ -144,7 +144,7 @@ class _MenteeCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              Text(inOffice ? 'В офисе' : 'Не в офисе', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                              Text(inOffice ? 'В офисе' : 'Не в офисе', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
                             ],
                           ),
                         ],
@@ -164,7 +164,7 @@ class _MenteeCard extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: progress,
                           backgroundColor: AppColors.divider,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                           minHeight: 8,
                         ),
                       ),
@@ -177,7 +177,7 @@ class _MenteeCard extends StatelessWidget {
                 if (latestEval != null) ...[
                    _buildEvalBadge(latestEval),
                 ] else ...[
-                  Text('⚠️ Нет оценок', style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text('⚠️ Нет оценок', style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
               ],
             ),
@@ -202,7 +202,7 @@ class _MenteeCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text('Последняя оценка: ', style: TextStyle(fontSize: 12)),
-          Text(avg.toStringAsFixed(1), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(avg.toStringAsFixed(1), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
           const Text(' / 5.0', style: TextStyle(fontSize: 12)),
         ],
       ),

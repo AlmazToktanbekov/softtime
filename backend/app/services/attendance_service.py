@@ -118,6 +118,7 @@ def process_check_out(
     ip_address: str,
     office_network_id: Optional[int],
     db: Session,
+    daily_report: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Attendance]]:
     if user.status == UserStatus.PENDING:
         return False, "Ожидайте подтверждения администратора", None
@@ -148,6 +149,11 @@ def process_check_out(
     record.check_out_ip = ip_address
     record.qr_verified_out = True
     record.office_network_id = office_network_id
+
+    # Сохраняем дневной отчёт
+    if daily_report and daily_report.strip():
+        record.daily_report = daily_report.strip()
+        record.daily_report_at = now
 
     # Определяем статус ухода по расписанию (независимо от статуса прихода)
     check_out_st = CheckOutStatus.ON_TIME

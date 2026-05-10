@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../core/models/duty_model.dart';
-import '../../../core/models/user_model.dart';
 import '../../../providers.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';

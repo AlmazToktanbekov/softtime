@@ -45,7 +45,7 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
         _all = emps
             .where((e) => !['ADMIN', 'SUPER_ADMIN'].contains(e.role))
             .toList();
-        // Сортировка по алфавиту по умолчанию
+        // Сортировка по алфавиту
         _all.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
         _loading = false;
       });
@@ -348,60 +348,161 @@ class _AdminEmployeesScreenState extends ConsumerState<AdminEmployeesScreen>
   void _editEmployee(EmployeeModel emp) {
     final nameCtrl = TextEditingController(text: emp.fullName);
     final loginCtrl = TextEditingController(text: emp.username);
+    final phoneCtrl = TextEditingController(text: emp.phone);
+    final passwordCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Редактировать профиль', style: TextStyle(fontFamily: 'Inter')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Полное имя'),
+        title: const Text('Редактировать сотрудника',
+            style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Полное имя'),
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Введите имя' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: loginCtrl,
+                  decoration: const InputDecoration(labelText: 'Логин'),
+                  validator: (v) {
+                    if (v == null || v.length < 3) return 'Минимум 3 символа';
+                    if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(v)) {
+                      return 'Только латиница и цифры';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Телефон (например, +996...)'),
+                  keyboardType: TextInputType.phone,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return null;
+                    if (!RegExp(r'^\+?[0-9]{9,15}$').hasMatch(v)) {
+                      return 'Неверный формат номера';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: passwordCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Новый пароль',
+                    hintText: 'Оставьте пустым, если не хотите менять',
+                    hintStyle: TextStyle(fontSize: 12),
+                  ),
+                  obscureText: true,
+                  validator: (v) {
+                    if (v != null && v.isNotEmpty && v.length < 6) {
+                      return 'Минимум 6 символов';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: loginCtrl,
-              decoration: const InputDecoration(labelText: 'Логин'),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
-          ),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
               try {
-                await ref.read(apiServiceProvider).updateEmployee(emp.id, {
-                  if (nameCtrl.text.isNotEmpty && nameCtrl.text != emp.fullName) 'full_name': nameCtrl.text,
-                  if (loginCtrl.text.isNotEmpty && loginCtrl.text != emp.username) 'username': loginCtrl.text,
-                });
+                final data = <String, dynamic>{};
+                if (nameCtrl.text != emp.fullName) {
+                  data['full_name'] = nameCtrl.text;
+                }
+                if (loginCtrl.text != emp.username) {
+                  data['username'] = loginCtrl.text;
+                }
+                if (phoneCtrl.text != emp.phone) {
+                  data['phone'] = phoneCtrl.text;
+                }
+                if (passwordCtrl.text.isNotEmpty) {
+                  data['password'] = passwordCtrl.text;
+                }
+
+                if (data.isEmpty) {
+                  Navigator.pop(ctx);
+                  return;
+                }
+
+                await ref.read(apiServiceProvider).updateEmployee(emp.id, data);
                 if (mounted) {
                   Navigator.pop(ctx);
                   _load();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Профиль обновлен'), backgroundColor: AppColors.success),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Данные обновлены'),
+                      backgroundColor: AppColors.success));
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Ошибка: $e'),
+                      backgroundColor: AppColors.error));
                 }
               }
             },
-            child: const Text('Сохранить', style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Сохранить', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
+
+void _confirmDelete(EmployeeModel emp) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Удаление'),
+      content: Text(
+          'Вы действительно хотите удалить сотрудника ${emp.fullName}? Это действие нельзя отменить.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+        TextButton(
+          onPressed: () async {
+            try {
+              await ref
+                  .read(apiServiceProvider)
+                  .updateEmployee(emp.id, {'status': 'DELETED'});
+              if (mounted) {
+                Navigator.pop(ctx);
+                _load();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Сотрудник удален'),
+                    backgroundColor: AppColors.error));
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+              }
+            }
+          },
+          child: const Text('Удалить', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> _updateRole(String id, String role) async {
     try {
@@ -701,6 +802,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
   final void Function(String) onStatusChange;
   final void Function(String) onRoleChange;
   final VoidCallback onEditProfile;
+  final VoidCallback onDelete;
 
   const _EmployeeDetailSheet({
     required this.emp,
@@ -708,6 +810,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
     required this.onStatusChange,
     required this.onRoleChange,
     required this.onEditProfile,
+    required this.onDelete,
   });
 
   @override
@@ -865,6 +968,13 @@ class _EmployeeDetailSheet extends StatelessWidget {
             iconColor: AppColors.primary,
             label: 'Редактировать профиль',
             onTap: onEditProfile,
+          ),
+          _actionTile(
+            context,
+            icon: Icons.delete_outline_rounded,
+            iconColor: AppColors.error,
+            label: 'Удалить сотрудника',
+            onTap: onDelete,
           ),
           const SizedBox(height: 16),
         ],

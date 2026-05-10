@@ -15,7 +15,10 @@ def mark_incomplete_sessions():
     """
     Для всех записей attendance за сегодня, где check_in есть, а check_out нет,
     и статус PRESENT или LATE — ставим INCOMPLETE.
+    check_out_time остаётся None → work_minutes = 0 (работал 0 часов).
     Уведомляем Admin о списке сотрудников, забывших check-out.
+
+    Запускается в 23:59 по времени Бишкека.
     """
     from app.database import SessionLocal
     from app.models.attendance import Attendance, AttendanceStatus
@@ -41,11 +44,16 @@ def mark_incomplete_sessions():
         count = 0
         for r in records:
             r.status = AttendanceStatus.INCOMPLETE
+            # check_out_time остаётся None → work_minutes = 0
+            # Добавляем заметку что забыл отсканировать QR при уходе
+            existing_note = r.note or ""
+            forget_note = "Не отсканировал QR при уходе — 0 часов"
+            r.note = f"{existing_note}. {forget_note}".strip(". ").strip() if existing_note else forget_note
             count += 1
 
         if count:
             db.commit()
-            logger.info(f"[CRON 23:00] INCOMPLETE: помечено {count} записей за {today}")
+            logger.info(f"[CRON 23:59] INCOMPLETE: помечено {count} записей за {today}")
 
             # Уведомить Admin о сотрудниках, забывших check-out
             admins = (
@@ -61,14 +69,14 @@ def mark_incomplete_sessions():
             notify_users(
                 admins,
                 title="Незакрытые сессии посещаемости",
-                body=f"{count} сотрудник(а/ов) не сделали check-out за {today}",
+                body=f"{count} сотрудник(а/ов) не сделали check-out за {today} — работа 0 часов",
                 data={"type": "incomplete_sessions", "count": count, "date": str(today)},
             )
         else:
-            logger.info(f"[CRON 23:00] Нет незакрытых сессий за {today}")
+            logger.info(f"[CRON 23:59] Нет незакрытых сессий за {today}")
     except Exception as e:
         db.rollback()
-        logger.error(f"[CRON 23:00] Ошибка посещаемости: {e}")
+        logger.error(f"[CRON 23:59] Ошибка посещаемости: {e}")
     finally:
         db.close()
 
@@ -199,8 +207,8 @@ def setup_scheduler():
         mark_incomplete_sessions,
         trigger="cron",
         hour=23,
-        minute=0,
-        id="incomplete_23",
+        minute=59,
+        id="incomplete_2359",
         replace_existing=True,
     )
     scheduler.add_job(

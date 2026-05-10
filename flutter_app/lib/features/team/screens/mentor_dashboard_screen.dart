@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/auth_provider.dart';
 
 class MentorDashboardScreen extends ConsumerStatefulWidget {
   const MentorDashboardScreen({super.key});
@@ -15,7 +14,6 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
   List<Map<String, dynamic>> _mentees = [];
   bool _loading = true;
   String? _error;
-  String? _selectedInternId;
 
   @override
   void initState() {
@@ -104,7 +102,7 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
                   '📊 Оценка: ${mentee['full_name']}',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
-                Text('Период: $period', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                Text('Период: $period', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
                 const SizedBox(height: 20),
                 _SliderRow(
                   label: '💪 Мотивация',
@@ -137,6 +135,8 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () async {
+                      final nav = Navigator.of(ctx);
+                      final sm = ScaffoldMessenger.of(context);
                       try {
                         await ApiService().createEvaluation({
                           'intern_id': mentee['id'],
@@ -146,18 +146,14 @@ class _MentorDashboardScreenState extends ConsumerState<MentorDashboardScreen> {
                           'communication_score': communication,
                           'comment': commentCtrl.text.trim().isEmpty ? null : commentCtrl.text.trim(),
                         });
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('✅ Оценка отправлена стажеру')),
-                          );
-                        }
+                        nav.pop();
+                        sm.showSnackBar(
+                          const SnackBar(content: Text('✅ Оценка отправлена стажеру')),
+                        );
                       } catch (e) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
-                          );
-                        }
+                        sm.showSnackBar(
+                          SnackBar(content: Text('Ошибка: $e'), backgroundColor: AppColors.error),
+                        );
                       }
                     },
                     child: const Text('Отправить оценку', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
@@ -253,7 +249,7 @@ class _MenteeCard extends StatelessWidget {
                 child: mentee['avatar_url'] == null
                     ? Text(
                         (mentee['full_name'] as String? ?? '?')[0].toUpperCase(),
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
                       )
                     : null,
               ),
@@ -276,7 +272,7 @@ class _MenteeCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text('$daysWorked дн. работы', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                        Text('$daysWorked дн. работы', style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
                       ],
                     ),
                   ],
@@ -288,7 +284,7 @@ class _MenteeCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Задачи: $done/$total', style: TextStyle(fontSize: 13, color: AppColors.textHint)),
+              Text('Задачи: $done/$total', style: const TextStyle(fontSize: 13, color: AppColors.textHint)),
               Text('${(taskProgress * 100).round()}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ],
           ),
@@ -298,7 +294,7 @@ class _MenteeCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: taskProgress,
               backgroundColor: AppColors.divider,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
               minHeight: 6,
             ),
           ),
@@ -311,7 +307,7 @@ class _MenteeCard extends StatelessWidget {
                   icon: const Icon(Icons.book_outlined, size: 16),
                   label: const Text('Дневник', style: TextStyle(fontSize: 13)),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.divider),
+                    side: const BorderSide(color: AppColors.divider),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -324,7 +320,7 @@ class _MenteeCard extends StatelessWidget {
                   icon: const Icon(Icons.star_outline, size: 16),
                   label: const Text('Оценки', style: TextStyle(fontSize: 13)),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.divider),
+                    side: const BorderSide(color: AppColors.divider),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -454,7 +450,7 @@ class _SliderRow extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            Text('$value / 5', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            Text('$value / 5', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
           ],
         ),
         Slider(
@@ -530,7 +526,7 @@ class _InternDiaryViewState extends State<_InternDiaryView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(e['diary_date'] ?? '', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+                      Text(e['diary_date'] ?? '', style: const TextStyle(color: AppColors.textHint, fontSize: 12)),
                       const SizedBox(height: 4),
                       Text(e['learned_today'] ?? '', style: const TextStyle(fontSize: 14)),
                     ],

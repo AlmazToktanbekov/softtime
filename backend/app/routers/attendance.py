@@ -18,6 +18,7 @@ from app.schemas.attendance import (
     AttendanceAdminCloseRequest,
     AttendanceResponse,
     MarkApprovedAbsenceRequest,
+    DailyReportResponse,
 )
 from app.utils.dependencies import get_current_user, require_admin
 from app.utils.audit import write_audit
@@ -116,6 +117,8 @@ def _serialize(a: Attendance, db: Session) -> AttendanceResponse:
         qr_verified_out=bool(a.qr_verified_out),
         office_network_id=a.office_network_id,
         note=a.note,
+        daily_report=a.daily_report,
+        daily_report_at=a.daily_report_at,
     )
 
 
@@ -172,7 +175,10 @@ def check_out(
         raise HTTPException(status_code=403, detail="Вы не подключены к офисной сети")
 
     network_id = office_network.id if office_network and office_network.id != 0 else None
-    success, message, attendance = process_check_out(current_user, ip_address, network_id, db)
+    success, message, attendance = process_check_out(
+        current_user, ip_address, network_id, db,
+        daily_report=data.daily_report,
+    )
 
     if not success or attendance is None:
         raise HTTPException(status_code=400, detail=message)
@@ -452,3 +458,85 @@ def today_office_status(
         "left_count": len(left),
         "not_arrived_count": len(not_arrived),
     }
+
+
+# ─── Дневные отчёты ─────────────────────────────────────────────────────────
+
+
+class DailyReportSubmit(BaseModel):
+    """Отправка/обновление отчёта отдельно (без check-out)."""
+    daily_report: str
+
+
+@router.get("/daily-reports", response_model=List[DailyReportResponse])
+def get_daily_reports(
+    report_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Дневные отчёты за день — видны ВСЕМ авторизованным сотрудникам.
+    Показывает отчёты только тех, кто сделал check-in (был в офисе).
+    """
+    if not report_date:
+        report_date = date.today()
+
+    records = (
+        db.query(Attendance)
+        .filter(
+            Attendance.date == report_date,
+            Attendance.check_in_time.isnot(None),
+        )
+        .order_by(Attendance.check_in_time)
+        .all()
+    )
+
+    result = []
+    for a in records:
+        user = db.query(User).filter(User.id == a.user_id).first()
+        result.append(DailyReportResponse(
+            user_id=a.user_id,
+            employee_name=user.full_name if user else None,
+            date=a.date,
+            daily_report=a.daily_report,
+            daily_report_at=a.daily_report_at,
+            check_in_time=a.check_in_time,
+            check_out_time=a.check_out_time,
+            formatted_check_in=_fmt_time(a.check_in_time),
+            formatted_check_out=_fmt_time(a.check_out_time),
+            work_duration=a.work_duration,
+            work_minutes=a.work_minutes,
+            status=a.status,
+        ))
+
+    return result
+
+
+@router.patch("/daily-report", response_model=AttendanceResponse)
+def submit_daily_report(
+    data: DailyReportSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Отправить/обновить дневной отчёт.
+    Можно написать отчёт до или после check-out.
+    """
+    from datetime import datetime
+
+    today = date.today()
+    record = (
+        db.query(Attendance)
+        .filter(Attendance.user_id == current_user.id, Attendance.date == today)
+        .first()
+    )
+
+    if not record or not record.check_in_time:
+        raise HTTPException(status_code=400, detail="Сначала нужно отметить приход")
+
+    record.daily_report = data.daily_report.strip()
+    record.daily_report_at = datetime.now().astimezone()
+
+    db.commit()
+    db.refresh(record)
+    return _serialize(record, db)

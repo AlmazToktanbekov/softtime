@@ -17,6 +17,7 @@ class CheckOutRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     qr_token: str
     device_info: Optional[str] = None
+    daily_report: Optional[str] = None  # Отчёт: что делал сегодня
 
 
 class AttendanceManualUpdate(BaseModel):
@@ -70,3 +71,23 @@ class AttendanceResponse(BaseModel):
     qr_verified_out: bool = False
     office_network_id: Optional[int] = None
     note: Optional[str] = None
+    daily_report: Optional[str] = None
+    daily_report_at: Optional[datetime] = None
+
+
+class DailyReportResponse(BaseModel):
+    """Отчёт сотрудника за день — виден всем."""
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    employee_name: Optional[str] = None
+    date: date
+    daily_report: Optional[str] = None
+    daily_report_at: Optional[datetime] = None
+    check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
+    formatted_check_in: Optional[str] = None
+    formatted_check_out: Optional[str] = None
+    work_duration: Optional[str] = None
+    work_minutes: int = 0
+    status: Optional[AttendanceStatus] = None

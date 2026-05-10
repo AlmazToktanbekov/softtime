@@ -112,3 +112,9 @@ class UserStatusUpdateRequest(BaseModel):
 
 class AvatarResponse(BaseModel):
     avatar_url: str
+
+
+# ── FCM token update ──────────────────────────────────────────────────────────
+
+class FCMTokenUpdate(BaseModel):
+    fcm_token: str

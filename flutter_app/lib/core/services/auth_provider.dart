@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 
 class AuthState {
   final UserModel? user;
@@ -39,6 +40,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         emp = await _api.getEmployee(user.id);
       } catch (_) {}
       state = state.copyWith(user: user, employee: emp);
+      
+      // Update FCM token on startup if already logged in
+      FcmService.updateToken();
+      
       return true;
     } catch (_) {
       return false;
@@ -60,6 +65,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       await _api.login(username, password);
       final (user, emp) = await _fetchUserAndEmployee();
       state = state.copyWith(user: user, employee: emp, isLoading: false);
+      
+      // Update FCM token after successful login
+      FcmService.updateToken();
+      
       return null;
     } on DioException catch (e) {
       final status = e.response?.statusCode;

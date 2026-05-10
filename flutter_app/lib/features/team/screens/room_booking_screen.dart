@@ -30,8 +30,8 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
         ApiService().getRoomBookings(date: dateStr),
       ]);
       setState(() {
-        _rooms = results[0] as List<Map<String, dynamic>>;
-        _bookings = results[1] as List<Map<String, dynamic>>;
+        _rooms = results[0];
+        _bookings = results[1];
         _loading = false;
       });
     } catch (e) {
@@ -163,7 +163,7 @@ class _RoomBookingScreenState extends State<RoomBookingScreen> {
                       if (ctx.mounted) Navigator.pop(ctx);
                       _loadData();
                     } catch (e) {
-                      if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Конфликт времени!')));
+                      if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Конфликт времени!')));
                     }
                   },
                   child: const Text('Забронировать', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -206,7 +206,7 @@ class _RoomCard extends StatelessWidget {
               leading: const Icon(Icons.access_time, size: 18),
               title: Text('${b['start_time']} - ${b['end_time']}', style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(b['title'] ?? ''),
-              trailing: Text(b['user_name'] ?? '', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+              trailing: Text(b['user_name'] ?? '', style: const TextStyle(color: AppColors.textHint, fontSize: 12)),
             )),
             const SizedBox(height: 8),
           ],

@@ -93,5 +93,17 @@ class FcmService {
     );
   }
 
+  static Future<void> updateToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        debugPrint('FCM Token (update): $token');
+        await ApiService().updateFcmToken(token);
+      }
+    } catch (e) {
+      debugPrint('Error updating FCM token: $e');
+    }
+  }
+
   static void dispose() {}
 }

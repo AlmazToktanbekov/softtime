@@ -72,7 +72,7 @@ class _InternProgressScreenState extends ConsumerState<InternProgressScreen>
     final daysWorked = hiredAtDate != null
         ? DateTime.now().difference(hiredAtDate).inDays
         : 0;
-    final probationDays = 30;
+    const probationDays = 30;
     final progress = (daysWorked / probationDays).clamp(0.0, 1.0);
 
     return Scaffold(
@@ -182,14 +182,14 @@ class _InternProgressScreenState extends ConsumerState<InternProgressScreen>
 
   Widget _buildDiaryTab() {
     if (_diary.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('📔', style: TextStyle(fontSize: 48)),
-            const SizedBox(height: 12),
-            const Text('Дневник пуст', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
+            Text('📔', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 12),
+            Text('Дневник пуст', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            SizedBox(height: 4),
             Text('Нажмите + чтобы добавить запись', style: TextStyle(color: AppColors.textHint)),
           ],
         ),
@@ -353,7 +353,7 @@ class _DiaryCard extends StatelessWidget {
             children: [
               Text(
                 entry['diary_date'] ?? '',
-                style: TextStyle(color: AppColors.textHint, fontSize: 13),
+                style: const TextStyle(color: AppColors.textHint, fontSize: 13),
               ),
               if (mood > 0) Text(moodEmojis[mood], style: const TextStyle(fontSize: 22)),
             ],
@@ -408,7 +408,7 @@ class _EvaluationCard extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text('${avg.toStringAsFixed(1)}/5.0', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+                child: Text('${avg.toStringAsFixed(1)}/5.0', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
@@ -418,7 +418,7 @@ class _EvaluationCard extends StatelessWidget {
           _ScoreRow(label: '💬 Общение', score: c),
           if (evaluation['comment'] != null && evaluation['comment'].toString().isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text('"${evaluation['comment']}"', style: TextStyle(color: AppColors.textHint, fontStyle: FontStyle.italic)),
+            Text('"${evaluation['comment']}"', style: const TextStyle(color: AppColors.textHint, fontStyle: FontStyle.italic)),
           ],
         ],
       ),
@@ -444,7 +444,7 @@ class _ScoreRow extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: score / 5.0,
                 backgroundColor: AppColors.divider,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
                 minHeight: 8,
               ),
             ),

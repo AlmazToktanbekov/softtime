@@ -1,0 +1,83 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.2.0, pluggy-1.6.0 -- /Applications/Xcode.app/Contents/Developer/usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /Users/thekubanych/vibecoder/softtime/backend
+plugins: anyio-4.12.1, asyncio-0.23.6
+asyncio: mode=strict
+collecting ... collected 1 item
+
+tests/test_auth.py::TestLoginEndpoint::test_wrong_password_raises_401 FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________ TestLoginEndpoint.test_wrong_password_raises_401 _______________
+
+self = <tests.test_auth.TestLoginEndpoint object at 0x106b036d0>
+mock_record = <MagicMock name='record_failed_attempt' id='4406704112'>
+mock_blocked = <MagicMock name='is_login_blocked' id='4410262144'>
+
+    @patch("app.routers.auth.is_login_blocked", return_value=False)
+    @patch("app.routers.auth.record_failed_attempt", return_value=1)
+    def test_wrong_password_raises_401(self, mock_record, mock_blocked):
+        from fastapi import HTTPException
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+        with pytest.raises(HTTPException) as exc:
+            self._call(db, "testuser", "WrongPass1!")
+        assert exc.value.status_code == 401
+>       mock_record.assert_called_once_with("testuser", ip="unknown")
+
+tests/test_auth.py:315: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py:919: in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <MagicMock name='record_failed_attempt' id='4406704112'>
+args = ('testuser',), kwargs = {'ip': 'unknown'}
+expected = call('testuser', ip='unknown')
+actual = call('testuser', ip=<MagicMock name='mock.headers.get()' id='4457399392'>)
+_error_message = <function NonCallableMock.assert_called_with.<locals>._error_message at 0x109c65d30>
+cause = None
+
+    def assert_called_with(self, /, *args, **kwargs):
+        """assert that the last call was made with the specified arguments.
+    
+        Raises an AssertionError if the args and keyword args passed in are
+        different to the last call to the mock."""
+        if self.call_args is None:
+            expected = self._format_mock_call_signature(args, kwargs)
+            actual = 'not called.'
+            error_message = ('expected call not found.\nExpected: %s\nActual: %s'
+                    % (expected, actual))
+            raise AssertionError(error_message)
+    
+        def _error_message():
+            msg = self._format_mock_failure_message(args, kwargs)
+            return msg
+        expected = self._call_matcher(_Call((args, kwargs), two=True))
+        actual = self._call_matcher(self.call_args)
+        if actual != expected:
+            cause = expected if isinstance(expected, Exception) else None
+>           raise AssertionError(_error_message()) from cause
+E           AssertionError: expected call not found.
+E           Expected: record_failed_attempt('testuser', ip='unknown')
+E           Actual: record_failed_attempt('testuser', ip=<MagicMock name='mock.headers.get()' id='4457399392'>)
+
+/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py:907: AssertionError
+=============================== warnings summary ===============================
+tests/test_auth.py::TestLoginEndpoint::test_wrong_password_raises_401
+  /Users/thekubanych/Library/Python/3.9/lib/python/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+    warnings.warn(eol_message.format("3.9"), FutureWarning)
+
+tests/test_auth.py::TestLoginEndpoint::test_wrong_password_raises_401
+  /Users/thekubanych/Library/Python/3.9/lib/python/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+    warnings.warn(eol_message.format("3.9"), FutureWarning)
+
+tests/test_auth.py::TestLoginEndpoint::test_wrong_password_raises_401
+  /Users/thekubanych/Library/Python/3.9/lib/python/site-packages/google/api_core/_python_version_support.py:242: FutureWarning: You are using a non-supported Python version (3.9.6). Google will not post any further updates to google.api_core supporting this Python version. Please upgrade to the latest Python version, or at least Python 3.10, and then update google.api_core.
+    warnings.warn(message, FutureWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_auth.py::TestLoginEndpoint::test_wrong_password_raises_401
+======================== 1 failed, 3 warnings in 1.31s =========================

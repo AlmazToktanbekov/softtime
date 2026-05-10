@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/auth_provider.dart';
 
 class KudosScreen extends ConsumerStatefulWidget {
   const KudosScreen({super.key});
@@ -203,7 +202,7 @@ class _KudosCard extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: Text(
               kudo['created_at'] != null ? kudo['created_at'].toString().split(' ')[0] : '',
-              style: TextStyle(color: AppColors.textHint, fontSize: 11),
+              style: const TextStyle(color: AppColors.textHint, fontSize: 11),
             ),
           ),
         ],

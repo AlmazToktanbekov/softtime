@@ -175,8 +175,8 @@ async function doLogin() {
   const p = document.getElementById('loginPassword').value;
   try {
     const r = await fetch(`${API}/auth/login`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username:u, password:p})
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'Ошибка');
@@ -185,7 +185,7 @@ async function doLogin() {
     localStorage.setItem('refresh_token', d.refresh_token);
     document.getElementById('loginPage').style.display = 'none';
     initApp();
-  } catch(e) {
+  } catch (e) {
     const el = document.getElementById('loginError');
     el.style.display = 'block';
     el.textContent = e.message;
@@ -226,18 +226,18 @@ async function fetchAllUsers(query = {}) {
   return all;
 }
 
-async function apiFetch(url, opts={}) {
-  opts.headers = {...(opts.headers||{}), 'Authorization': `Bearer ${accessToken}`, 'Content-Type':'application/json'};
-  let r = await fetch(API+url, opts);
+async function apiFetch(url, opts = {}) {
+  opts.headers = { ...(opts.headers || {}), 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+  let r = await fetch(API + url, opts);
   if (r.status === 401) {
     const ok = await tryRefresh();
     if (ok) {
       opts.headers['Authorization'] = `Bearer ${accessToken}`;
-      r = await fetch(API+url, opts);
+      r = await fetch(API + url, opts);
     } else { doLogout(); return null; }
   }
   if (!r.ok) {
-    const d = await r.json().catch(()=>({}));
+    const d = await r.json().catch(() => ({}));
     throw new Error(formatApiDetail(d));
   }
   if (r.status === 204 || r.status === 205) return null;
@@ -251,8 +251,8 @@ async function tryRefresh() {
   if (!rt) return false;
   try {
     const r = await fetch(`${API}/auth/refresh`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({refresh_token:rt})
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: rt })
     });
     if (!r.ok) return false;
     const d = await r.json();
@@ -266,15 +266,15 @@ async function tryRefresh() {
 // =========== INIT ===========
 async function initApp() {
   const now = new Date();
-  document.getElementById('topbarDate').textContent = now.toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+  document.getElementById('topbarDate').textContent = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('dashDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   try {
     const me = await apiFetch('/auth/me');
     if (me) {
       document.getElementById('sidebarName').textContent = me.username;
       document.getElementById('sidebarAvatar').textContent = me.username[0].toUpperCase();
     }
-  } catch(_) {}
+  } catch (_) { }
   loadDashboard();
   loadRequestsBadge();
   loadPendingBadge();
@@ -284,7 +284,7 @@ async function initApp() {
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('page-' + name).classList.add('active');
   el.classList.add('active');
   const titles = {
     dashboard: 'Дашборд',
@@ -313,6 +313,17 @@ function showPage(name, el) {
   else if (name === 'news') loadNews();
   else if (name === 'schedule') loadScheduleEmployeeList();
   else if (name === 'auditlog') loadAuditLog();
+
+  const sidebar = document.querySelector('.sidebar.open');
+  if (sidebar) toggleSidebar();
+}
+
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar || !backdrop) return;
+  sidebar.classList.toggle('open');
+  backdrop.classList.toggle('open');
 }
 
 // =========== DASHBOARD ===========
@@ -385,7 +396,7 @@ async function loadDashboard() {
       const weekStart = weekStartD.toISOString().split('T')[0];
       const weekly = await apiFetch(`/reports/period?start_date=${weekStart}&end_date=${weekEnd}`);
       renderDashWeekChart(weekly.chart_data || []);
-    } catch(err) {
+    } catch (err) {
       console.error('Ошибка загрузки недельного графика:', err);
       const wrap = document.getElementById('dashWeekChartWrap');
       if (wrap) wrap.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:80px 0">Ошибка загрузки данных</p>`;
@@ -409,7 +420,7 @@ function renderDashWeekChart(chartData) {
     return;
   }
 
-  const dayLabels = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
   const labels = chartData.map(d => {
     const dt = new Date(d.date + 'T00:00:00');
     return dayLabels[dt.getDay()] + ' ' + dt.getDate();
@@ -421,8 +432,8 @@ function renderDashWeekChart(chartData) {
       labels,
       datasets: [
         { label: 'Присутствовали', data: chartData.map(d => d.present), backgroundColor: 'rgba(24,119,242,0.75)', borderRadius: 6 },
-        { label: 'Опоздали',       data: chartData.map(d => d.late),    backgroundColor: 'rgba(251,188,4,0.75)',  borderRadius: 6 },
-        { label: 'Отсутствовали',  data: chartData.map(d => d.absent),  backgroundColor: 'rgba(234,67,53,0.6)',   borderRadius: 6 },
+        { label: 'Опоздали', data: chartData.map(d => d.late), backgroundColor: 'rgba(251,188,4,0.75)', borderRadius: 6 },
+        { label: 'Отсутствовали', data: chartData.map(d => d.absent), backgroundColor: 'rgba(234,67,53,0.6)', borderRadius: 6 },
       ],
     },
     options: {
@@ -457,8 +468,8 @@ function renderEmployees(list) {
   // Сортировка по алфавиту
   list.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
 
-  const roleLabels = { SUPER_ADMIN:'Супер Админ', ADMIN:'Админ', TEAM_LEAD:'Тимлид', EMPLOYEE:'Сотрудник', INTERN:'Стажёр' };
-  const statusLabels = { ACTIVE:'Активен', BLOCKED:'Заблокирован', LEAVE:'В отпуске', WARNING:'Предупреждение', DELETED:'Удалён' };
+  const roleLabels = { SUPER_ADMIN: 'Супер Админ', ADMIN: 'Админ', TEAM_LEAD: 'Тимлид', EMPLOYEE: 'Сотрудник', INTERN: 'Стажёр' };
+  const statusLabels = { ACTIVE: 'Активен', BLOCKED: 'Заблокирован', LEAVE: 'В отпуске', WARNING: 'Предупреждение', DELETED: 'Удалён' };
   const mediaBase = API.replace(/\/api\/v1\/?$/, '');
   tbody.innerHTML = list.map(e => {
     const avatarUrl = e.avatar_url ? (e.avatar_url.startsWith('http') ? e.avatar_url : `${mediaBase}${e.avatar_url}`) : null;
@@ -484,15 +495,15 @@ function renderEmployees(list) {
       <td style="color:var(--text-sub)">${e.email || '—'}</td>
       <td>
         ${e.status === 'ACTIVE'
-          ? '<span class="badge badge-active">Активен</span>'
-          : `<span class="badge badge-inactive">${statusLabels[e.status] || e.status}</span>`}
+        ? '<span class="badge badge-active">Активен</span>'
+        : `<span class="badge badge-inactive">${statusLabels[e.status] || e.status}</span>`}
       </td>
       <td style="display:flex; gap:8px; flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="openEmployeeProfile('${e.id}')" style="color:var(--primary); border-color:var(--primary)">👤 Профиль</button>
         ${e.status === 'ACTIVE'
-          ? `<button class="btn btn-ghost btn-sm" onclick="deactivateEmployee('${e.id}')" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
-          : (e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="activateEmployee('${e.id}')" style="color:var(--accent); border-color:var(--accent)">Актив.</button>` : '')}
-        ${e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="openResetPassword('${e.id}', '${(e.full_name||'').replace(/'/g,'&apos;')}')" style="color:var(--primary); border-color:var(--primary)">🔑 Пароль</button>` : ''}
+        ? `<button class="btn btn-ghost btn-sm" onclick="deactivateEmployee('${e.id}')" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+        : (e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="activateEmployee('${e.id}')" style="color:var(--accent); border-color:var(--accent)">Актив.</button>` : '')}
+        ${e.status !== 'DELETED' ? `<button class="btn btn-ghost btn-sm" onclick="openResetPassword('${e.id}', '${(e.full_name || '').replace(/'/g, '&apos;')}')" style="color:var(--primary); border-color:var(--primary)">🔑 Пароль</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="deleteEmployee('${e.id}')">Удалить</button>
       </td>
     </tr>
@@ -507,7 +518,7 @@ async function openEmployeeProfile(userId) {
   let emp;
   try {
     emp = await apiFetch(`/users/${userId}`);
-  } catch(e) {
+  } catch (e) {
     showToast('Ошибка загрузки профиля: ' + e.message, 'error');
     return;
   }
@@ -516,17 +527,17 @@ async function openEmployeeProfile(userId) {
     ? (emp.avatar_url.startsWith('http') ? emp.avatar_url : `${mediaBase}${emp.avatar_url}`)
     : null;
 
-  const roleLabels = { SUPER_ADMIN:'Супер Админ', ADMIN:'Админ', TEAM_LEAD:'Тимлид', EMPLOYEE:'Сотрудник', INTERN:'Стажёр' };
-  const statusLabels = { ACTIVE:'Активен', PENDING:'Ожидает', BLOCKED:'Заблокирован', LEAVE:'В отпуске', WARNING:'Предупреждение', DELETED:'Удалён' };
+  const roleLabels = { SUPER_ADMIN: 'Супер Админ', ADMIN: 'Админ', TEAM_LEAD: 'Тимлид', EMPLOYEE: 'Сотрудник', INTERN: 'Стажёр' };
+  const statusLabels = { ACTIVE: 'Активен', PENDING: 'Ожидает', BLOCKED: 'Заблокирован', LEAVE: 'В отпуске', WARNING: 'Предупреждение', DELETED: 'Удалён' };
 
   const avatarBlock = avatarSrc
     ? `<img id="empProfilePhoto" src="${avatarSrc}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='';this.style.display='none';document.getElementById('empProfileInitial').style.display='flex'">`
     : '';
-  const initialBlock = `<div id="empProfileInitial" style="width:100px;height:100px;border-radius:50%;background:rgba(26,115,232,0.1);display:${avatarSrc ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:40px;font-weight:800;color:var(--primary)">${(emp.full_name||'?')[0].toUpperCase()}</div>`;
+  const initialBlock = `<div id="empProfileInitial" style="width:100px;height:100px;border-radius:50%;background:rgba(26,115,232,0.1);display:${avatarSrc ? 'none' : 'flex'};align-items:center;justify-content:center;font-size:40px;font-weight:800;color:var(--primary)">${(emp.full_name || '?')[0].toUpperCase()}</div>`;
 
   const fields = [
     ['ФИО', emp.full_name],
-    ['Логин', '@' + (emp.username||'—')],
+    ['Логин', '@' + (emp.username || '—')],
     ['Email', emp.email || '—'],
     ['Телефон', emp.phone || '—'],
     ['Роль', roleLabels[emp.role] || emp.role || '—'],
@@ -611,8 +622,8 @@ async function saveEmployeeDetails(userId) {
   if (phone && !/^\+?[0-9]{9,15}$/.test(phone)) return showToast('Неверный формат телефона', 'error');
 
   try {
-    const payload = { 
-      full_name: fullName, 
+    const payload = {
+      full_name: fullName,
       username: username,
       phone: phone || null,
       team_name: team_name || null
@@ -621,15 +632,15 @@ async function saveEmployeeDetails(userId) {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
-    
+
     // Обновляем в локальном кэше
     const idx = allEmployees.findIndex(e => e.id === userId);
     if (idx !== -1) allEmployees[idx] = { ...allEmployees[idx], ...updated };
-    
+
     filterEmployees();
     showToast('Данные обновлены', 'success');
     document.getElementById('empProfileModal').remove();
-  } catch(e) {
+  } catch (e) {
     showToast('Ошибка: ' + e.message, 'error');
   }
 }
@@ -664,7 +675,7 @@ async function uploadEmployeeAvatar(userId, input) {
     const emp = allEmployees.find(e => e.id === userId);
     if (emp) emp.avatar_url = data.avatar_url;
     showToast('Фото обновлено', 'success');
-  } catch(e) {
+  } catch (e) {
     showToast('Ошибка: ' + e.message, 'error');
   }
 }
@@ -770,7 +781,7 @@ async function loadPendingBadge() {
       badge.style.display = 'none';
       tabCount.style.display = 'none';
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function createEmployee() {
@@ -789,18 +800,20 @@ async function createEmployee() {
   if (phone && !/^\+?[0-9]{9,15}$/.test(phone)) return showToast('Неверный формат телефона', 'error');
 
   try {
-    await apiFetch('/users', {method:'POST', body: JSON.stringify({
-      full_name: fullName,
-      email: email,
-      phone: phone || null,
-      team_name: document.getElementById('empDept').value || null,
-      username: username,
-      password: password,
-    })});
+    await apiFetch('/users', {
+      method: 'POST', body: JSON.stringify({
+        full_name: fullName,
+        email: email,
+        phone: phone || null,
+        team_name: document.getElementById('empDept').value || null,
+        username: username,
+        password: password,
+      })
+    });
     closeModal('addEmployee');
     showToast('Сотрудник создан', 'success');
     loadEmployees();
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function activateEmployee(id) {
@@ -846,13 +859,13 @@ function openResetPassword(id, name) {
 }
 
 async function confirmResetPassword() {
-  const id  = document.getElementById('resetPwdUserId').value;
+  const id = document.getElementById('resetPwdUserId').value;
   const pwd = document.getElementById('resetPwdInput').value.trim();
   const pwd2 = document.getElementById('resetPwdConfirm').value.trim();
   const errEl = document.getElementById('resetPwdError');
 
   if (pwd.length < 6) { errEl.textContent = 'Минимум 6 символов'; return; }
-  if (pwd !== pwd2)   { errEl.textContent = 'Пароли не совпадают'; return; }
+  if (pwd !== pwd2) { errEl.textContent = 'Пароли не совпадают'; return; }
 
   try {
     await apiFetch(`/users/${id}/reset-password`, {
@@ -869,7 +882,7 @@ async function confirmResetPassword() {
 // =========== ATTENDANCE ===========
 function setDefaultDates() {
   const today = new Date().toISOString().split('T')[0];
-  const weekAgo = new Date(Date.now()-7*86400000).toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
   document.getElementById('attStartDate').value = weekAgo;
   document.getElementById('attEndDate').value = today;
 }
@@ -885,8 +898,9 @@ async function loadAttendance() {
   try {
     const records = await apiFetch(url) || [];
     renderAttendance(records);
-  } catch(err) {
-document.getElementById('attendanceTable').innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${err.message}</td></tr>`;  }
+  } catch (err) {
+    document.getElementById('attendanceTable').innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--error); padding:32px">Ошибка: ${err.message}</td></tr>`;
+  }
 }
 
 function renderAttendance(list) {
@@ -913,8 +927,8 @@ function renderAttendance(list) {
       <td>${r.overtime_minutes > 0 ? `<span style="color:var(--primary); font-weight:700">${r.overtime_minutes} мин</span>` : '—'}</td>
       <td style="display:flex; gap:6px; flex-wrap:wrap">
         ${!r.check_out_time
-          ? `<button class="btn btn-ghost btn-sm" onclick="openManualCheckout('${r.id}', '${(r.employee_name||'').replace(/'/g,'')}')" style="color:var(--primary); border-color:var(--primary)">⏱ Уход</button>`
-          : '—'}
+      ? `<button class="btn btn-ghost btn-sm" onclick="openManualCheckout('${r.id}', '${(r.employee_name || '').replace(/'/g, '')}')" style="color:var(--primary); border-color:var(--primary)">⏱ Уход</button>`
+      : '—'}
       </td>
     </tr>
   `).join('');
@@ -983,7 +997,7 @@ function renderRequests(list) {
           <div style="font-weight:700">${r.user_full_name || '—'}</div>
         </td>
         <td>${typeLabel}</td>
-        <td>${period}${r.start_time ? `<div style="font-size:12px;color:var(--text-sub)">в ${String(r.start_time).slice(0,5)}</div>` : ''}</td>
+        <td>${period}${r.start_time ? `<div style="font-size:12px;color:var(--text-sub)">в ${String(r.start_time).slice(0, 5)}</div>` : ''}</td>
         <td style="max-width:260px; white-space:normal">${r.comment_employee || '—'}</td>
         <td>${statusBadgeForRequest(r.status, statusLabel)}</td>
         <td style="max-width:220px; white-space:normal">${r.comment_admin || '—'}</td>
@@ -1079,13 +1093,13 @@ async function loadNetworks() {
         <td style="color:var(--text-sub)">${n.description || '—'}</td>
         <td>
           ${n.is_active
-            ? '<span class="badge badge-active">Активна</span>'
-            : '<span class="badge badge-inactive">Неактивна</span>'}
+        ? '<span class="badge badge-active">Активна</span>'
+        : '<span class="badge badge-inactive">Неактивна</span>'}
         </td>
         <td style="display:flex; gap:8px; flex-wrap:wrap">
           ${n.is_active
-            ? `<button class="btn btn-ghost btn-sm" onclick="deactivateNetwork(${n.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
-            : `<button class="btn btn-ghost btn-sm" onclick="activateNetwork(${n.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
+        ? `<button class="btn btn-ghost btn-sm" onclick="deactivateNetwork(${n.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+        : `<button class="btn btn-ghost btn-sm" onclick="activateNetwork(${n.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
           <button class="btn btn-danger btn-sm" onclick="deleteNetwork(${n.id})">Удалить</button>
         </td>
       </tr>
@@ -1160,7 +1174,7 @@ async function loadCurrentQR() {
       <p style="margin-top:16px; font-size:13px; color:var(--text-sub)">Тип: ${data.type}</p>
       <p style="font-size:11px; font-family:monospace; margin-top:8px; color:var(--text-muted); word-break:break-all">${data.token}</p>
     `;
-  } catch(e) {
+  } catch (e) {
     document.getElementById('qrContainer').innerHTML = `<p style="color:var(--error)">${e.message}</p>`;
   }
 }
@@ -1195,13 +1209,13 @@ async function loadQrHistory() {
         <td>${q.expires_at ? new Date(q.expires_at).toLocaleString('ru-RU') : '—'}</td>
         <td>
           ${q.is_active
-            ? '<span class="badge badge-active">Активен</span>'
-            : '<span class="badge badge-inactive">Неактивен</span>'}
+        ? '<span class="badge badge-active">Активен</span>'
+        : '<span class="badge badge-inactive">Неактивен</span>'}
         </td>
         <td style="display:flex; gap:8px; flex-wrap:wrap">
           ${q.is_active
-            ? `<button class="btn btn-ghost btn-sm" onclick="deactivateQr(${q.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
-            : `<button class="btn btn-ghost btn-sm" onclick="activateQr(${q.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
+        ? `<button class="btn btn-ghost btn-sm" onclick="deactivateQr(${q.id})" style="color:var(--warning); border-color:var(--warning)">Деакт.</button>`
+        : `<button class="btn btn-ghost btn-sm" onclick="activateQr(${q.id})" style="color:var(--accent); border-color:var(--accent)">Актив.</button>`}
           <button class="btn btn-danger btn-sm" onclick="deleteQr(${q.id})">Удалить</button>
         </td>
       </tr>
@@ -1248,7 +1262,7 @@ async function deleteQr(id) {
 
 // =========== REPORTS ===========
 let reportChart = null;
-let reportMode  = 'period';
+let reportMode = 'period';
 
 function switchReportMode(mode, el) {
   reportMode = mode;
@@ -1269,10 +1283,10 @@ function setQuickPeriod(type, el) {
     mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
     startStr = mon.toISOString().split('T')[0];
   } else if (type === 'month') {
-    startStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+    startStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
   }
   document.getElementById('repStartDate').value = startStr;
-  document.getElementById('repEndDate').value   = todayStr;
+  document.getElementById('repEndDate').value = todayStr;
   loadReports();
 }
 
@@ -1294,7 +1308,7 @@ function _fmtHours(minutes) {
 
 function _repStatCards(items) {
   return `<div class="stats-grid" style="margin-bottom:20px">
-    ${items.map(([l,v,c]) => `
+    ${items.map(([l, v, c]) => `
       <div class="stat-card">
         <div class="stat-value" style="color:${c}">${v}</div>
         <div class="stat-label">${l}</div>
@@ -1310,10 +1324,10 @@ async function initReportsPage() {
     if (!allEmployees.length) allEmployees = await fetchAllUsers();
     const sel = document.getElementById('repEmployeeId');
     const activeEmps = allEmployees.filter(e => e.status === 'ACTIVE' &&
-      !['ADMIN','SUPER_ADMIN'].includes(e.role));
+      !['ADMIN', 'SUPER_ADMIN'].includes(e.role));
     sel.innerHTML = '<option value="">— Выберите сотрудника —</option>' +
       activeEmps.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
-  } catch(_) {}
+  } catch (_) { }
 }
 
 async function loadReports() {
@@ -1323,7 +1337,7 @@ async function loadReports() {
 
 async function loadPeriodReport() {
   const start = document.getElementById('repStartDate').value;
-  const end   = document.getElementById('repEndDate').value;
+  const end = document.getElementById('repEndDate').value;
   if (!start || !end) return;
 
   document.getElementById('reportContent').innerHTML =
@@ -1339,15 +1353,15 @@ async function loadPeriodReport() {
     try {
       const daily = await apiFetch(`/reports/daily?report_date=${detailDate}`);
       dailyDetail = daily.detail || [];
-    } catch(_) {}
+    } catch (_) { }
 
     document.getElementById('reportContent').innerHTML = `
       ${_repStatCards([
-        ['Всего сотрудников',  s.total_employees,              'var(--primary)'],
-        ['Присутствовали',     s.worked_today ?? s.present,    'var(--accent)'],
-        ['Опоздали',           s.late,                         'var(--warning)'],
-        ['Отсутствовали',      s.absent,                       'var(--error)'],
-      ])}
+      ['Всего сотрудников', s.total_employees, 'var(--primary)'],
+      ['Присутствовали', s.worked_today ?? s.present, 'var(--accent)'],
+      ['Опоздали', s.late, 'var(--warning)'],
+      ['Отсутствовали', s.absent, 'var(--error)'],
+    ])}
 
       <div class="card" style="margin-bottom:20px">
         <div class="card-header">
@@ -1372,11 +1386,11 @@ async function loadPeriodReport() {
               <th>Отсутствия</th><th>Разреш. отсут.</th>
             </tr></thead>
             <tbody>${!data.employees.length
-              ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">Нет данных</td></tr>'
-              : data.employees.map(e => `
+        ? '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px">Нет данных</td></tr>'
+        : data.employees.map(e => `
                 <tr>
                   <td style="font-weight:700">${e.full_name || '—'}</td>
-                  <td>${e.team_name||'—'}</td>
+                  <td>${e.team_name || '—'}</td>
                   <td style="color:var(--accent);font-weight:700">${e.days_present}</td>
                   <td style="color:var(--primary);font-weight:700">${_fmtHours(e.total_work_minutes)}</td>
                   <td>${e.days_late > 0 ? `<span style="color:var(--warning)">${e.days_late}</span>` : '—'}</td>
@@ -1403,13 +1417,13 @@ async function loadPeriodReport() {
             </tr></thead>
             <tbody>${dailyDetail.map(d => `
               <tr>
-                <td style="font-weight:700">${d.employee_name||d.full_name||'—'}</td>
-                <td>${d.team_name||'—'}</td>
-                <td style="color:var(--accent)">${d.check_in_time||'—'}</td>
-                <td style="color:var(--error)">${d.check_out_time||'—'}</td>
-                <td style="color:var(--primary)">${d.work_duration||'—'}</td>
+                <td style="font-weight:700">${d.employee_name || d.full_name || '—'}</td>
+                <td>${d.team_name || '—'}</td>
+                <td style="color:var(--accent)">${d.check_in_time || '—'}</td>
+                <td style="color:var(--error)">${d.check_out_time || '—'}</td>
+                <td style="color:var(--primary)">${d.work_duration || '—'}</td>
                 <td>${statusBadge(d.status)}</td>
-                <td>${d.late_minutes>0 ? `<span style="color:var(--warning)">${d.late_minutes} мин</span>` : '—'}</td>
+                <td>${d.late_minutes > 0 ? `<span style="color:var(--warning)">${d.late_minutes} мин</span>` : '—'}</td>
               </tr>`).join('')}
             </tbody>
           </table>
@@ -1418,12 +1432,12 @@ async function loadPeriodReport() {
     `;
 
     renderAttendanceChart(data.chart_data);
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 async function loadEmployeeReport() {
-  const start  = document.getElementById('repStartDate').value;
-  const end    = document.getElementById('repEndDate').value;
+  const start = document.getElementById('repStartDate').value;
+  const end = document.getElementById('repEndDate').value;
   const userId = document.getElementById('repEmployeeId').value;
 
   if (!userId) {
@@ -1439,7 +1453,7 @@ async function loadEmployeeReport() {
     let url = `/reports/employee/${userId}`;
     const params = [];
     if (start) params.push(`start_date=${start}`);
-    if (end)   params.push(`end_date=${end}`);
+    if (end) params.push(`end_date=${end}`);
     if (params.length) url += '?' + params.join('&');
 
     const data = await apiFetch(url);
@@ -1447,17 +1461,17 @@ async function loadEmployeeReport() {
 
     document.getElementById('reportContent').innerHTML = `
       ${_repStatCards([
-        ['Дней присутствовал', s.days_present,        'var(--accent)'],
-        ['Дней опоздал',       s.days_late,            'var(--warning)'],
-        ['Опоздание (мин)',    s.total_late_minutes,   'var(--warning)'],
-        ['Часов работал',      _fmtHours(s.total_work_minutes), 'var(--primary)'],
-      ])}
+      ['Дней присутствовал', s.days_present, 'var(--accent)'],
+      ['Дней опоздал', s.days_late, 'var(--warning)'],
+      ['Опоздание (мин)', s.total_late_minutes, 'var(--warning)'],
+      ['Часов работал', _fmtHours(s.total_work_minutes), 'var(--primary)'],
+    ])}
 
       <div class="card">
         <div class="card-header">
           <div>
             <div class="card-title">${data.full_name}</div>
-            <div class="card-sub">${start||''} — ${end||''}</div>
+            <div class="card-sub">${start || ''} — ${end || ''}</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -1467,23 +1481,23 @@ async function loadEmployeeReport() {
               <th>Статус</th><th>Опоздание</th><th>Примечание</th>
             </tr></thead>
             <tbody>${!data.records.length
-              ? '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Нет записей за период</td></tr>'
-              : data.records.map(r => `
+        ? '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px">Нет записей за период</td></tr>'
+        : data.records.map(r => `
                 <tr>
                   <td style="font-weight:700">${_repFmtDate(r.date)}</td>
-                  <td style="color:var(--accent)">${r.check_in||'—'}</td>
-                  <td style="color:var(--error)">${r.check_out||'—'}</td>
-                  <td style="color:var(--primary)">${r.work_duration||'—'}</td>
+                  <td style="color:var(--accent)">${r.check_in || '—'}</td>
+                  <td style="color:var(--error)">${r.check_out || '—'}</td>
+                  <td style="color:var(--primary)">${r.work_duration || '—'}</td>
                   <td>${statusBadge(r.status)}</td>
-                  <td>${r.late_minutes>0 ? `<span style="color:var(--warning)">${r.late_minutes} мин</span>` : '—'}</td>
-                  <td style="color:var(--text-sub);font-size:12px;font-weight:400">${r.note||'—'}</td>
+                  <td>${r.late_minutes > 0 ? `<span style="color:var(--warning)">${r.late_minutes} мин</span>` : '—'}</td>
+                  <td style="color:var(--text-sub);font-size:12px;font-weight:400">${r.note || '—'}</td>
                 </tr>`).join('')}
             </tbody>
           </table>
         </div>
       </div>
     `;
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 function renderAttendanceChart(chartData) {
@@ -1491,7 +1505,7 @@ function renderAttendanceChart(chartData) {
   const canvas = document.getElementById('reportChartCanvas');
   if (!canvas || !chartData?.length) return;
 
-  const labels  = chartData.map(d => _repFmtDate(d.date));
+  const labels = chartData.map(d => _repFmtDate(d.date));
   reportChart = new Chart(canvas, {
     type: 'bar',
     data: {
@@ -1569,12 +1583,12 @@ function switchDutyTab(tab, el) {
 async function loadDutySchedule() {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const end = new Date(Date.now() + 30*86400000).toISOString().split('T')[0];
+    const end = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
     const list = await apiFetch(`/duty/schedule?start_date=${today}&end_date=${end}`) || [];
 
     const typeLabel = t => t === 'LUNCH' ? '🍽️ Обед' : t === 'CLEANING' ? '🧹 Уборка' : t || '—';
     const typeColor = t => t === 'LUNCH' ? 'var(--primary)' : 'var(--accent)';
-    const typeBg   = t => t === 'LUNCH' ? 'rgba(26,115,232,0.1)' : 'rgba(0,200,83,0.1)';
+    const typeBg = t => t === 'LUNCH' ? 'rgba(26,115,232,0.1)' : 'rgba(0,200,83,0.1)';
 
     document.getElementById('dutyContent').innerHTML = `
       <div class="card">
@@ -1586,8 +1600,8 @@ async function loadDutySchedule() {
           <table>
             <thead><tr><th>Дата</th><th>Сотрудник</th><th>Тип</th><th>Выполнено</th><th>Подтверждено</th><th>Действия</th></tr></thead>
             <tbody>${!list.length
-              ? '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет назначений</td></tr>'
-              : list.map(d => `
+        ? '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет назначений</td></tr>'
+        : list.map(d => `
                 <tr>
                   <td style="font-weight:700">${d.date}</td>
                   <td><div style="font-weight:700">${d.user_full_name || '—'}</div></td>
@@ -1597,11 +1611,11 @@ async function loadDutySchedule() {
                     </span>
                   </td>
                   <td>${d.is_completed
-                    ? '<span class="badge badge-present">✓ Да</span>'
-                    : '<span class="badge badge-absent">✗ Нет</span>'}</td>
+            ? '<span class="badge badge-present">✓ Да</span>'
+            : '<span class="badge badge-absent">✗ Нет</span>'}</td>
                   <td>${d.verified
-                    ? '<span class="badge badge-completed">✓ Да</span>'
-                    : '<span class="badge badge-manual">— Нет</span>'}</td>
+            ? '<span class="badge badge-completed">✓ Да</span>'
+            : '<span class="badge badge-manual">— Нет</span>'}</td>
                   <td style="display:flex; gap:6px; flex-wrap:wrap">
                     ${d.is_completed && !d.verified ? `
                       <button class="btn btn-ghost btn-sm" onclick="verifyDuty('${d.id}', true)" style="color:var(--accent); border-color:var(--accent)">✓ Подтв.</button>
@@ -1641,7 +1655,7 @@ async function loadDutyChecklist() {
         <div style="display:flex; flex-direction:column; gap:8px">
           ${items.map((t, i) => `
             <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--surface); border-radius:12px; border:1px solid var(--border)">
-              <span style="font-size:16px; color:var(--text-muted); font-weight:700; min-width:20px">${i+1}.</span>
+              <span style="font-size:16px; color:var(--text-muted); font-weight:700; min-width:20px">${i + 1}.</span>
               <div style="flex:1; font-weight:600">${t.text || t.title || '—'}</div>
               <span class="badge ${t.is_active ? 'badge-active' : 'badge-inactive'}">${t.is_active ? 'Активна' : 'Скрыта'}</span>
             </div>`).join('')}
@@ -1654,9 +1668,9 @@ async function loadDutyChecklist() {
           <div class="card-title">Задачи чеклиста</div>
         </div>
         ${!allItems.length
-          ? '<p style="color:var(--text-muted); text-align:center; padding:20px">Нет задач</p>'
-          : renderGroup(lunch || [], 'Обед', '🍽️', 'var(--primary)') +
-            renderGroup(cleaning || [], 'Уборка', '🧹', 'var(--accent)')}
+        ? '<p style="color:var(--text-muted); text-align:center; padding:20px">Нет задач</p>'
+        : renderGroup(lunch || [], 'Обед', '🍽️', 'var(--primary)') +
+        renderGroup(cleaning || [], 'Уборка', '🧹', 'var(--accent)')}
       </div>`;
   } catch (e) {
     document.getElementById('dutyContent').innerHTML = `<p style="color:var(--error); padding:20px">${e.message}</p>`;
@@ -1715,7 +1729,7 @@ let editingNewsId = null;
 async function loadNews() {
   try {
     const list = await apiFetch('/news') || [];
-    const typeLabels = { general:'Общее', announcement:'Объявление', urgent:'Срочно', system_update:'Обновление' };
+    const typeLabels = { general: 'Общее', announcement: 'Объявление', urgent: 'Срочно', system_update: 'Обновление' };
     const tbody = document.getElementById('newsTable');
     if (!list.length) {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Нет новостей</td></tr>';
@@ -1725,7 +1739,7 @@ async function loadNews() {
       <tr>
         <td>
           <div style="display:flex; align-items:center; gap:10px">
-            ${n.image_url ? `<img src="${n.image_url.startsWith('http') ? n.image_url : API.replace('/api/v1','') + n.image_url}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : ''}
+            ${n.image_url ? `<img src="${n.image_url.startsWith('http') ? n.image_url : API.replace('/api/v1', '') + n.image_url}" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : ''}
             <div>
               <div style="font-weight:700">${n.title}</div>
               <div style="font-size:12px; color:var(--text-sub); max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${n.content}</div>
@@ -1739,7 +1753,7 @@ async function loadNews() {
         </td>
         <td style="color:var(--text-sub)">${n.created_at ? new Date(n.created_at).toLocaleDateString('ru-RU') : '—'}</td>
         <td style="display:flex; gap:6px; flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" onclick="editNews('${n.id}', ${JSON.stringify(n).replace(/"/g,'&quot;')})" style="color:var(--primary); border-color:var(--primary)">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="editNews('${n.id}', ${JSON.stringify(n).replace(/"/g, '&quot;')})" style="color:var(--primary); border-color:var(--primary)">✏️</button>
           <button class="btn btn-ghost btn-sm" onclick="toggleNewsPin('${n.id}')" style="color:var(--warning); border-color:var(--warning)">${n.pinned ? '📌' : '📍'}</button>
           <button class="btn btn-danger btn-sm" onclick="deleteNews('${n.id}')">🗑</button>
         </td>
@@ -1753,7 +1767,7 @@ async function loadNewsStats(newsId, btn) {
     const s = await apiFetch(`/news/${newsId}/stats`);
     btn.textContent = `${s.read_count}/${s.total_employees}`;
     btn.disabled = true;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function openAddNewsModal() {
@@ -1781,7 +1795,7 @@ function editNews(id, news) {
   document.getElementById('newsImageFile').value = '';
   document.getElementById('newsUploadBtn').style.display = 'none';
   if (news.image_url) {
-    const src = news.image_url.startsWith('http') ? news.image_url : API.replace('/api/v1','') + news.image_url;
+    const src = news.image_url.startsWith('http') ? news.image_url : API.replace('/api/v1', '') + news.image_url;
     document.getElementById('newsImagePreviewImg').src = src;
     document.getElementById('newsImagePreview').style.display = '';
     document.getElementById('newsImageStatus').textContent = 'Текущее фото';
@@ -1886,7 +1900,7 @@ async function loadEmployeeSchedule() {
   if (!userId) return;
   try {
     const list = await apiFetch(`/employee-schedules/employee/${userId}`) || [];
-    const dayNames = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+    const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     const scheduleMap = {};
     list.forEach(d => { scheduleMap[d.day_of_week] = d; });
 
@@ -1897,12 +1911,12 @@ async function loadEmployeeSchedule() {
           <button class="btn btn-primary btn-sm" onclick="saveAllSchedule('${userId}')">💾 Сохранить</button>
         </div>
         <div style="display:flex; flex-direction:column; gap:12px" id="scheduleRows">
-          ${[0,1,2,3,4,5,6].map(d => {
-            const day = scheduleMap[d];
-            const isWork = day ? day.is_working_day : d < 5;
-            const start = day?.start_time ? day.start_time.slice(0,5) : '09:00';
-            const end = day?.end_time ? day.end_time.slice(0,5) : '18:00';
-            return `
+          ${[0, 1, 2, 3, 4, 5, 6].map(d => {
+      const day = scheduleMap[d];
+      const isWork = day ? day.is_working_day : d < 5;
+      const start = day?.start_time ? day.start_time.slice(0, 5) : '09:00';
+      const end = day?.end_time ? day.end_time.slice(0, 5) : '18:00';
+      return `
               <div style="display:grid; grid-template-columns:140px 120px 1fr; align-items:center; gap:16px; padding:14px 16px; background:var(--surface); border-radius:12px; border:1px solid var(--border)">
                 <div style="font-weight:700">${dayNames[d]}</div>
                 <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer">
@@ -1915,7 +1929,7 @@ async function loadEmployeeSchedule() {
                   <input type="time" id="sched_end_${d}" value="${end}" class="filter-input" style="width:120px">
                 </div>
               </div>`;
-          }).join('')}
+    }).join('')}
         </div>
       </div>`;
   } catch (e) {
@@ -1935,10 +1949,10 @@ async function saveAllSchedule(userId) {
     const start = document.getElementById(`sched_start_${d}`)?.value;
     const end = document.getElementById(`sched_end_${d}`)?.value;
     if (isWork && start && end) {
-      const [sh,sm] = start.split(':').map(Number);
-      const [eh,em] = end.split(':').map(Number);
-      const dur = (eh*60+em) - (sh*60+sm);
-      if (dur < 360) { showToast(`${['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]}: рабочий день не менее 6 часов`, 'error'); return; }
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      const dur = (eh * 60 + em) - (sh * 60 + sm);
+      if (dur < 360) { showToast(`${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][d]}: рабочий день не менее 6 часов`, 'error'); return; }
     }
     days.push({ day_of_week: d, is_working_day: !!isWork, start_time: isWork ? start : null, end_time: isWork ? end : null });
   }
@@ -1953,15 +1967,15 @@ async function saveAllSchedule(userId) {
 // =========== HELPERS ===========
 function statusBadge(s) {
   const map = {
-    present:          ['badge-present',           '✅ В офисе'],
-    late:             ['badge-late',              '⚠️ Опоздание'],
-    absent:           ['badge-absent',            '❌ Не пришёл'],
-    incomplete:       ['badge-incomplete',        '🕒 Не завершил день'],
-    completed:        ['badge-completed',         '✔️ Завершён'],
-    manual:           ['badge-manual',            '✏️ Вручную'],
-    approved_absence: ['badge-approved-absence',  '✓ Разреш. отсутствие'],
-    early_leave:      ['badge-early-leave',       '🏃 Ранний уход'],
-    overtime:         ['badge-overtime',          '⏰ Сверхурочно'],
+    present: ['badge-present', '✅ В офисе'],
+    late: ['badge-late', '⚠️ Опоздание'],
+    absent: ['badge-absent', '❌ Не пришёл'],
+    incomplete: ['badge-incomplete', '🕒 Не завершил день'],
+    completed: ['badge-completed', '✔️ Завершён'],
+    manual: ['badge-manual', '✏️ Вручную'],
+    approved_absence: ['badge-approved-absence', '✓ Разреш. отсутствие'],
+    early_leave: ['badge-early-leave', '🏃 Ранний уход'],
+    overtime: ['badge-overtime', '⏰ Сверхурочно'],
   };
 
   if (!s) return '<span class="badge badge-absent">—</span>';
@@ -1970,14 +1984,14 @@ function statusBadge(s) {
 }
 
 function openModal(name) {
-  document.getElementById('modal-'+name).classList.add('open');
+  document.getElementById('modal-' + name).classList.add('open');
 }
 
 function closeModal(name) {
-  document.getElementById('modal-'+name).classList.remove('open');
+  document.getElementById('modal-' + name).classList.remove('open');
 }
 
-function showToast(msg, type='success') {
+function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
   const asText = (() => {
     if (msg == null) return '';
@@ -1985,19 +1999,19 @@ function showToast(msg, type='success') {
     if (msg instanceof Error) return msg.message || String(msg);
     try { return JSON.stringify(msg); } catch (_) { return String(msg); }
   })();
-  t.textContent = (type==='success'?'✅ ':'❌ ') + asText;
+  t.textContent = (type === 'success' ? '✅ ' : '❌ ') + asText;
   t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 // Close modal on backdrop click
 document.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', e => { if (e.target===el) el.classList.remove('open'); });
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
 
 // Enter key on login
 document.getElementById('loginPassword').addEventListener('keydown', e => {
-  if (e.key==='Enter') doLogin();
+  if (e.key === 'Enter') doLogin();
 });
 
 // =========== AUDIT LOG ===========
@@ -2028,9 +2042,9 @@ async function loadAuditLog() {
     // Фильтрация по поиску на клиенте (по action/entity)
     const filtered = search
       ? logs.filter(l =>
-          (l.action || '').toLowerCase().includes(search.toLowerCase()) ||
-          (l.entity || '').toLowerCase().includes(search.toLowerCase())
-        )
+        (l.action || '').toLowerCase().includes(search.toLowerCase()) ||
+        (l.entity || '').toLowerCase().includes(search.toLowerCase())
+      )
       : logs;
 
     tbody.innerHTML = filtered.map(log => {
@@ -2041,7 +2055,7 @@ async function loadAuditLog() {
         <td style="white-space:nowrap;font-size:12px">${ts}</td>
         <td>${escHtml(actor)}</td>
         <td><span class="badge" style="background:rgba(24,119,242,.1);color:var(--primary);font-size:11px;padding:2px 8px;border-radius:6px">${escHtml(log.action || '—')}</span></td>
-        <td style="font-size:12px">${escHtml(log.entity || '—')} ${log.entity_id ? '<span style="opacity:.5;font-size:10px">' + String(log.entity_id).slice(0,8) + '…</span>' : ''}</td>
+        <td style="font-size:12px">${escHtml(log.entity || '—')} ${log.entity_id ? '<span style="opacity:.5;font-size:10px">' + String(log.entity_id).slice(0, 8) + '…</span>' : ''}</td>
         <td style="font-size:11px;color:var(--text-sub);max-width:300px">${newVal}</td>
       </tr>`;
     }).join('');
@@ -2052,7 +2066,7 @@ async function loadAuditLog() {
 
 function escHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function formatAuditDetail(val) {
@@ -2063,7 +2077,7 @@ function formatAuditDetail(val) {
   }
   if (typeof obj === 'object' && !Array.isArray(obj)) {
     return Object.entries(obj)
-      .filter(([,v]) => v != null && v !== '')
+      .filter(([, v]) => v != null && v !== '')
       .map(([k, v]) => `<span style="color:var(--text-muted)">${escHtml(k)}:</span> <b>${escHtml(String(v))}</b>`)
       .join(' &nbsp;·&nbsp; ');
   }
@@ -2073,7 +2087,7 @@ function formatAuditDetail(val) {
 // ── Global search (filters visible table rows by name) ───────────────────────
 function handleGlobalSearch(query) {
   const q = query.toLowerCase().trim();
-  
+
   // Если мы на странице сотрудников, вызываем специальный фильтр
   if (document.getElementById('page-employees').classList.contains('active')) {
     filterEmployees();

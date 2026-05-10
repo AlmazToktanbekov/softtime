@@ -76,7 +76,7 @@ class _MentorEvaluationScreenState extends State<MentorEvaluationScreen> {
             TextField(
               controller: _commentCtrl,
               maxLines: 4,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Что стажеру стоит подтянуть? Что получается хорошо?',
                 fillColor: AppColors.surface,
                 filled: true,
@@ -126,7 +126,7 @@ class _MentorEvaluationScreenState extends State<MentorEvaluationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.mentee['full_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('Дней на стажировке: ${widget.mentee['days_worked']}', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                Text('Дней на стажировке: ${widget.mentee['days_worked']}', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
               ],
             ),
           ),
@@ -143,7 +143,7 @@ class _MentorEvaluationScreenState extends State<MentorEvaluationScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-            Text('$value/5', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
+            Text('$value/5', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         Slider(

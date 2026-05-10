@@ -165,12 +165,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         }
       }
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _done = true;
           _loading = false;
           _avatarUploadFailed = !avatarOk;
         });
+      }
     } on DioException catch (e) {
       // Network / no response
       if (e.response == null) {
@@ -193,21 +194,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         // FastAPI validation errors: [{"loc":[...], "msg":"...", ...}, ...]
         try {
           final first = (data['detail'] as List).cast<dynamic>().first;
-          if (first is Map && first['msg'] is String)
+          if (first is Map && first['msg'] is String) {
             detail = first['msg'] as String;
+          }
         } catch (_) {}
       }
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = detail;
           _loading = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = 'Ошибка подключения';
           _loading = false;
         });
+      }
     }
   }
 

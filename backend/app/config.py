@@ -27,8 +27,12 @@ class Settings(BaseSettings):
     WORK_END_MINUTE: int = 0
     GRACE_PERIOD_MINUTES: int = 5
 
-    # CORS — admin_web использует same-origin, мобильное приложение CORS не использует
-    BACKEND_CORS_ORIGINS: list = ["*"]
+    # CORS — разрешаем только официальный админ-сайт и локальную разработку
+    BACKEND_CORS_ORIGINS: list = [
+        "https://softtime.softjol.site",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
 
     # Ключ для публичных эндпоинтов регистрации (Flutter app)
     APP_REGISTRATION_KEY: str = "change-me-registration-key"

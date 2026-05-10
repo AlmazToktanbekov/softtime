@@ -19,7 +19,6 @@ import '../../../core/widgets/status_badge.dart';
 const _kTeal = Color(0xFF06D6A0);
 const _kOrange = Color(0xFFFF8C42);
 const _kCard1 = Color.fromARGB(255, 0, 36, 199);
-const _kCard2 = Color(0xFF3BC9A0);
 const _kCard3 = Color(0xFFFF6B6B);
 const _kBg = Color(0xFFEEF0F8);
 
@@ -149,11 +148,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } catch (e) {
       debugPrint('loadOfficeStatus error: $e');
     }
-    if (mounted)
+    if (mounted) {
       setState(() {
         _officeStatus = data;
         _loadingOffice = false;
       });
+    }
   }
 
   Future<void> _loadIncomingSwaps() async {
@@ -179,12 +179,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } catch (e) {
       error = _parseError(e);
     }
-    if (mounted)
+    if (mounted) {
       setState(() {
         _today = result;
         _loadingAttendance = false;
         if (error != null) _error = error;
       });
+    }
   }
 
   Future<void> _loadDuty() async {
@@ -193,11 +194,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       duties = await ref.read(apiServiceProvider).getTodayDuties();
     } catch (_) {}
-    if (mounted)
+    if (mounted) {
       setState(() {
         _todayDuties = duties;
         _loadingDuty = false;
       });
+    }
   }
 
   Future<void> _loadNews() async {
@@ -206,11 +208,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       news = (await ref.read(apiServiceProvider).getNews()).take(3).toList();
     } catch (_) {}
-    if (mounted)
+    if (mounted) {
       setState(() {
         _news = news;
         _loadingNews = false;
       });
+    }
   }
 
   Future<void> _loadSchedule() async {
@@ -218,15 +221,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     List<EmployeeScheduleModel> schedules = [];
     try {
       final uid = ref.read(authProvider).user?.id;
-      if (uid != null)
+      if (uid != null) {
         schedules =
             await ref.read(apiServiceProvider).getEmployeeSchedules(uid);
+      }
     } catch (_) {}
-    if (mounted)
+    if (mounted) {
       setState(() {
         _schedules = schedules;
         _loadingSchedule = false;
       });
+    }
   }
 
   Future<void> _onCheckIn() async {
@@ -252,9 +257,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final result =
         await context.push<String>('/qr-scanner', extra: 'check_out');
     if (result == null || !mounted) return;
+
+    final report = await _showDailyReportDialog();
+    if (report == null) return; // Cancelled
+
     setState(() => _actionLoading = true);
     try {
-      final rec = await ref.read(apiServiceProvider).checkOut(result);
+      final rec = await ref.read(apiServiceProvider).checkOut(result, dailyReport: report);
       if (!mounted) return;
       setState(() {
         _today = rec;
@@ -266,6 +275,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       setState(() => _actionLoading = false);
       _showSnack(_parseError(e), AppColors.error);
     }
+  }
+
+  Future<String?> _showDailyReportDialog() async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('Дневной отчёт', style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Что вы сделали сегодня? Что успели?', style: TextStyle(fontFamily: 'Inter')),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ctrl,
+                    maxLines: 4,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Кратко опишите проделанную работу...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: const Text('Отмена', style: TextStyle(color: Colors.grey, fontFamily: 'Inter')),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: ctrl.text.trim().isEmpty
+                      ? null
+                      : () => Navigator.of(ctx).pop(ctrl.text.trim()),
+                  child: const Text('Отправить уход', style: TextStyle(color: Colors.white, fontFamily: 'Inter')),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
   }
 
   String _parseError(dynamic e) {
@@ -1172,8 +1233,8 @@ class _AttendanceCard extends StatelessWidget {
         ],
       ),
       child: loading
-          ? Padding(
-              padding: const EdgeInsets.all(20), child: _Shimmer(height: 120))
+          ? const Padding(
+              padding: EdgeInsets.all(20), child: _Shimmer(height: 120))
           : Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -1192,12 +1253,12 @@ class _AttendanceCard extends StatelessWidget {
                             color: AppColors.primary, size: 18),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
+                      const Expanded(
                         child: Text(
                           'Посещаемость',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
@@ -1312,7 +1373,7 @@ class _AttendanceCard extends StatelessWidget {
 
                   // action area
                   if (!enableCheckInOut)
-                    _InfoBox(
+                    const _InfoBox(
                       color: AppColors.primary,
                       bg: AppColors.primaryLight,
                       icon: Icons.info_outline_rounded,
@@ -1320,7 +1381,7 @@ class _AttendanceCard extends StatelessWidget {
                           'Для администраторов учёт посещаемости ведётся через панель администратора.',
                     )
                   else if (_excused)
-                    _InfoBox(
+                    const _InfoBox(
                       color: AppColors.success,
                       bg: AppColors.successLight,
                       icon: Icons.verified_user_rounded,
@@ -1583,17 +1644,17 @@ class _DutySectionHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return _CardShell(child: const _Shimmer(height: 60));
+      return const _CardShell(child: _Shimmer(height: 60));
     }
 
     if (duties.isEmpty) {
       return _CardShell(
         onTap: onOpen,
-        child: Row(children: [
+        child: const Row(children: [
           _IconBox(
               color: AppColors.primary, icon: Icons.cleaning_services_rounded),
-          const SizedBox(width: 14),
-          const Expanded(
+          SizedBox(width: 14),
+          Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Дежурство сегодня',
@@ -1610,7 +1671,7 @@ class _DutySectionHome extends StatelessWidget {
                       fontFamily: 'Inter')),
             ]),
           ),
-          const Icon(Icons.chevron_right_rounded,
+          Icon(Icons.chevron_right_rounded,
               color: AppColors.textHint, size: 18),
         ]),
       );
@@ -1743,24 +1804,24 @@ class _ScheduleMini extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
+            const Row(children: [
               _IconBox(
-                  color: const Color(0xFF7B61FF),
+                  color: Color(0xFF7B61FF),
                   icon: Icons.calendar_month_rounded),
-              const SizedBox(width: 12),
-              const Text('Мой график',
+              SizedBox(width: 12),
+              Text('Мой график',
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                       fontFamily: 'Inter')),
-              const Spacer(),
-              const Text('Подробнее',
+              Spacer(),
+              Text('Подробнее',
                   style: TextStyle(
                       fontSize: 12,
                       color: AppColors.primary,
                       fontFamily: 'Inter')),
-              const Icon(Icons.chevron_right_rounded,
+              Icon(Icons.chevron_right_rounded,
                   color: AppColors.primary, size: 16),
             ]),
             const SizedBox(height: 16),
@@ -1866,7 +1927,7 @@ class _NewsMini extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Row(children: [
-              _IconBox(color: _kCard3, icon: Icons.newspaper_rounded),
+              const _IconBox(color: _kCard3, icon: Icons.newspaper_rounded),
               const SizedBox(width: 12),
               const Text('Новости',
                   style: TextStyle(
@@ -1891,8 +1952,8 @@ class _NewsMini extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (loading)
-            Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
                 child: _Shimmer(height: 80))
           else if (news.isEmpty)
             const Padding(
@@ -2135,8 +2196,8 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Row(children: [
-              _IconBox(
-                  color: const Color(0xFF06D6A0), icon: Icons.groups_rounded),
+              const _IconBox(
+                  color: Color(0xFF06D6A0), icon: Icons.groups_rounded),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -2217,11 +2278,11 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
               ? const Padding(
                   padding: EdgeInsets.all(20), child: _Shimmer(height: 80))
               : currentList.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(20),
+                  ? const Padding(
+                      padding: EdgeInsets.all(20),
                       child: Center(
                         child: Text('Нет данных',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 color: AppColors.textHint,
                                 fontSize: 13,
                                 fontFamily: 'Inter')),
@@ -2278,7 +2339,7 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
                             ),
                             if (checkIn != null)
                               Row(mainAxisSize: MainAxisSize.min, children: [
-                                Icon(Icons.login_rounded,
+                                const Icon(Icons.login_rounded,
                                     size: 12, color: AppColors.success),
                                 const SizedBox(width: 3),
                                 Text(checkIn,
@@ -2289,7 +2350,7 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
                                         fontWeight: FontWeight.w600)),
                                 if (checkOut != null) ...[
                                   const SizedBox(width: 8),
-                                  Icon(Icons.logout_rounded,
+                                  const Icon(Icons.logout_rounded,
                                       size: 12, color: AppColors.textHint),
                                   const SizedBox(width: 3),
                                   Text(checkOut,
@@ -2385,50 +2446,57 @@ class _FeatureLinksSection extends StatelessWidget {
 
     final List<_FeatureLink> links = [
       // Для всех
-      _FeatureLink(
+      const _FeatureLink(
         icon: Icons.calendar_month_rounded,
         label: 'Календарь',
         subtitle: 'Кто в офисе',
-        color: const Color(0xFF3B82F6),
+        color: Color(0xFF3B82F6),
         route: '/home/team-calendar',
       ),
-      _FeatureLink(
+      const _FeatureLink(
         icon: Icons.favorite_rounded,
         label: 'Кудосы',
         subtitle: 'Благодарности коллегам',
-        color: const Color(0xFFFF6B35),
+        color: Color(0xFFFF6B35),
         route: '/home/kudos',
       ),
-      _FeatureLink(
+      const _FeatureLink(
         icon: Icons.emoji_events_rounded,
         label: 'Очки',
         subtitle: 'Магазин призов',
-        color: const Color(0xFFFFB347),
+        color: Color(0xFFFFB347),
         route: '/home/rewards',
       ),
-      _FeatureLink(
+      const _FeatureLink(
         icon: Icons.meeting_room_rounded,
         label: 'Переговорки',
         subtitle: 'Бронирование',
-        color: const Color(0xFF4F46E5),
+        color: Color(0xFF4F46E5),
         route: '/home/rooms',
+      ),
+      const _FeatureLink(
+        icon: Icons.assignment_turned_in_rounded,
+        label: 'Дневные отчёты',
+        subtitle: 'Кто что сделал',
+        color: Color(0xFF06D6A0),
+        route: '/home/daily-reports',
       ),
       // Только для стажеров
       if (isIntern)
-        _FeatureLink(
+        const _FeatureLink(
           icon: Icons.trending_up_rounded,
           label: 'Мой прогресс',
           subtitle: 'Дневник и оценки',
-          color: const Color(0xFF10B981),
+          color: Color(0xFF10B981),
           route: '/home/intern-progress',
         ),
       // Только для менторов
       if (isTeamLead)
-        _FeatureLink(
+        const _FeatureLink(
           icon: Icons.supervisor_account_rounded,
           label: 'Подопечные',
           subtitle: 'Панель ментора',
-          color: const Color(0xFF8B5CF6),
+          color: Color(0xFF8B5CF6),
           route: '/home/mentor-dashboard',
         ),
     ];

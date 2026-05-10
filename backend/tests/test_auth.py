@@ -203,6 +203,7 @@ def _make_user(**kwargs) -> MagicMock:
     u.team_name = None
     u.team_id = kwargs.get("team_id", None)
     u.mentor_id = kwargs.get("mentor_id", None)
+    u.mentor_full_name = kwargs.get("mentor_full_name", None)
     u.avatar_url = None
     u.hired_at = None
     u.created_at = datetime.now(timezone.utc)
@@ -311,7 +312,8 @@ class TestLoginEndpoint:
         with pytest.raises(HTTPException) as exc:
             self._call(db, "testuser", "WrongPass1!")
         assert exc.value.status_code == 401
-        mock_record.assert_called_once_with("testuser")
+        mock_record.assert_called_once()
+        assert mock_record.call_args[0][0] == "testuser"
 
     @patch("app.routers.auth.is_login_blocked", return_value=False)
     @patch("app.routers.auth.verify_password", return_value=True)

@@ -308,10 +308,11 @@ class ApiService {
     return AttendanceModel.fromJson(response.data);
   }
 
-  Future<AttendanceModel> checkOut(String qrToken) async {
+  Future<AttendanceModel> checkOut(String qrToken, {String? dailyReport}) async {
     final response = await dio.post('/attendance/check-out', data: {
       'qr_token': qrToken,
       'device_info': 'Flutter App',
+      if (dailyReport != null) 'daily_report': dailyReport,
     });
     return AttendanceModel.fromJson(response.data);
   }

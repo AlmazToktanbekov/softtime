@@ -12,6 +12,7 @@ import 'features/news/screens/news_screen.dart';
 import 'features/news/screens/news_detail_screen.dart';
 import 'features/attendance/screens/qr_scanner_screen.dart';
 import 'features/attendance/screens/history_screen.dart';
+import 'features/attendance/screens/daily_reports_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
 import 'features/requests/screens/requests_screen.dart';
 import 'features/schedule/screens/schedule_screen.dart';
@@ -211,6 +212,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 parentNavigatorKey: _rootNavigatorKey,
                 pageBuilder: (_, state) =>
                     _slideRoute(state, const RequestsScreen()),
+              ),
+              GoRoute(
+                path: 'daily-reports',
+                parentNavigatorKey: _rootNavigatorKey,
+                pageBuilder: (_, state) =>
+                    _slideRoute(state, const DailyReportsScreen()),
               ),
               GoRoute(
                 path: 'profile',
