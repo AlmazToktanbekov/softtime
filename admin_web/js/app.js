@@ -185,6 +185,7 @@ async function doLogin() {
     localStorage.setItem('refresh_token', d.refresh_token);
     document.getElementById('loginPage').style.display = 'none';
     initApp();
+    showMobileHeader(u);
   } catch (e) {
     const el = document.getElementById('loginError');
     el.style.display = 'block';
@@ -2104,3 +2105,42 @@ if (accessToken) {
   document.getElementById('loginPage').style.display = 'none';
   initApp();
 }
+
+// Mobile sidebar toggle
+function toggleSidebar() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+// Show mobile header after login
+function showMobileHeader(username) {
+  if (window.innerWidth <= 768) {
+    document.getElementById('mobileHeader').style.display = 'flex';
+    document.getElementById('mobileUser').textContent = username || '';
+  }
+}
+
+// Check screen size and toggle mobile elements
+window.addEventListener('resize', function() {
+  if (window.innerWidth <= 768) {
+    document.getElementById('mobileHeader').style.display = 'flex';
+  } else {
+    document.getElementById('mobileHeader').style.display = 'none';
+    document.querySelector('.sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+  }
+});
+
+// Initial check
+if (window.innerWidth <= 768) {
+  document.getElementById('mobileHeader').style.display = 'flex';
+}
+
+// Close sidebar when clicking a nav item on mobile
+document.querySelectorAll('.sidebar-item').forEach(item => {
+  item.addEventListener('click', function() {
+    if (window.innerWidth <= 768) {
+      toggleSidebar();
+    }
+  });
+});

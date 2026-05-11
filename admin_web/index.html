@@ -11,6 +11,16 @@
 </head>
 <body>
 
+<!-- Mobile Header (hidden on desktop) -->
+<div class="mobile-header" id="mobileHeader" style="display:none">
+  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+  <span class="mobile-logo">SoftTime</span>
+  <span class="mobile-user" id="mobileUser"></span>
+</div>
+
+<!-- Sidebar Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <!-- Login Page -->
 <div class="login-page" id="loginPage">
   <div class="login-card">
