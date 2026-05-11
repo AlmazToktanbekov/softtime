@@ -16,57 +16,83 @@ class FcmService {
 
   static Future<void> init() async {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // Try to initialize Firebase with error handling
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (e) {
+        debugPrint('[FCM] Firebase init failed: $e - continuing without FCM');
+        return;
+      }
 
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-      // Request permission
       final messaging = FirebaseMessaging.instance;
-      NotificationSettings settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      
+      // Request permission with timeout
+      try {
+        await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        ).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('[FCM] Permission request failed: $e');
+      }
 
-      debugPrint('User granted permission: ${settings.authorizationStatus}');
-
-      // Setup local notifications for foreground messages
-      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const iosInit = DarwinInitializationSettings();
-      const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
-      await _localNotifications.initialize(settings: initSettings);
+      // Setup local notifications
+      try {
+        const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+        const iosInit = DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
+        const initSettings = InitializationSettings(android: androidInit, iOS: iosInit);
+        await _localNotifications.initialize(settings: initSettings);
+      } catch (e) {
+        debugPrint('[FCM] Local notifications init failed: $e');
+      }
 
       // Listen to foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        debugPrint('Got a message whilst in the foreground!');
-        debugPrint('Message data: ${message.data}');
-
-        if (message.notification != null) {
-          debugPrint('Message also contained a notification: ${message.notification}');
-          _showLocalNotification(message);
+        try {
+          if (message.notification != null) {
+            _showLocalNotification(message);
+          }
+        } catch (e) {
+          debugPrint('[FCM] Failed to handle foreground message: $e');
         }
       });
 
-      // Get token
-      final token = await messaging.getToken();
-      if (token != null) {
-        debugPrint('FCM Token: $token');
-        try {
-          await ApiService().updateFcmToken(token);
-        } catch (_) {}
+      // Get and send FCM token
+      try {
+        final token = await messaging.getToken().timeout(const Duration(seconds: 5));
+        if (token != null && token.isNotEmpty) {
+          try {
+            await ApiService().updateFcmToken(token).timeout(const Duration(seconds: 5));
+          } catch (e) {
+            debugPrint('[FCM] Token update failed (non-fatal): $e');
+          }
+        }
+      } catch (e) {
+        debugPrint('[FCM] Failed to get token: $e');
       }
 
-      // Listen to token updates
-      messaging.onTokenRefresh.listen((newToken) async {
-        try {
-          await ApiService().updateFcmToken(newToken);
-        } catch (_) {}
-      });
+      // Listen for token refresh
+      try {
+        messaging.onTokenRefresh.listen((newToken) {
+          try {
+            ApiService().updateFcmToken(newToken);
+          } catch (_) {}
+        });
+      } catch (e) {
+        debugPrint('[FCM] Token refresh listener error: $e');
+      }
 
     } catch (e) {
-      debugPrint('Error initializing FCM: $e');
+      debugPrint('[FCM] Critical init error: $e - app continues without notifications');
     }
   }
 

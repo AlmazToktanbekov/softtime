@@ -78,7 +78,7 @@ class _TeamCalendarScreenState extends ConsumerState<TeamCalendarScreen> {
           ),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: isNotArrived ? Colors.grey.shade200 : AppColors.primary.withOpacity(0.1),
+              backgroundColor: isNotArrived ? Colors.grey.shade200 : AppColors.primary.withValues(alpha: 0.1),
               child: Text(item['name'][0], style: TextStyle(color: isNotArrived ? Colors.grey : AppColors.primary, fontWeight: FontWeight.bold)),
             ),
             title: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w600)),

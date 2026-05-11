@@ -358,7 +358,7 @@ class _DutyScreenState extends ConsumerState<DutyScreen>
                             color: const Color(0xFFFFF3F3),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: AppColors.error.withOpacity(0.3)),
+                                color: AppColors.error.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -795,7 +795,7 @@ class _DutyCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: shadowColor.withOpacity(0.3),
+            color: shadowColor.withValues(alpha: 0.3),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -806,7 +806,7 @@ class _DutyCard extends StatelessWidget {
           Container(
             width: 52, height: 52,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: Colors.white, size: 26),
@@ -836,7 +836,7 @@ class _DutyCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(statusLabel!,
@@ -1218,7 +1218,7 @@ class _AssignmentTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
+                  color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(statusLabel,

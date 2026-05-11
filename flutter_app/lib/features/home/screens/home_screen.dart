@@ -655,7 +655,7 @@ class _Header extends StatelessWidget {
                         margin: const EdgeInsets.only(right: 8),
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.admin_panel_settings_outlined,
@@ -668,10 +668,10 @@ class _Header extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.4), width: 2),
+                            color: Colors.white.withValues(alpha: 0.4), width: 2),
                       ),
                       child: ClipOval(
                         child: avatarUrl.isNotEmpty
@@ -718,7 +718,7 @@ class _Header extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -868,7 +868,7 @@ class _StatMiniCardState extends State<_StatMiniCard>
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withOpacity(0.35),
+                color: widget.color.withValues(alpha: 0.35),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
@@ -880,7 +880,7 @@ class _StatMiniCardState extends State<_StatMiniCard>
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(widget.icon, color: Colors.white, size: 16),
@@ -904,7 +904,7 @@ class _StatMiniCardState extends State<_StatMiniCard>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   fontSize: 11,
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w500,
@@ -957,9 +957,9 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.08),
+        color: AppColors.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.error.withOpacity(0.25)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -1007,7 +1007,7 @@ class _DutyCalloutCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: _kOrange.withOpacity(0.35),
+              color: _kOrange.withValues(alpha: 0.35),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -1018,7 +1018,7 @@ class _DutyCalloutCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(Icons.restaurant_menu_rounded,
@@ -1084,10 +1084,10 @@ class _SwapRequestBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF4361EE).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF4361EE).withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4361EE).withOpacity(0.1),
+              color: const Color(0xFF4361EE).withValues(alpha: 0.1),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -1101,7 +1101,7 @@ class _SwapRequestBanner extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4361EE).withOpacity(0.1),
+                    color: const Color(0xFF4361EE).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(Icons.swap_horiz_rounded,
@@ -1226,7 +1226,7 @@ class _AttendanceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -1356,7 +1356,7 @@ class _AttendanceCard extends StatelessWidget {
                             icon: Icons.arrow_downward_rounded,
                             label: 'Ушёл раньше: ${record!.earlyLeaveMinutes} мин',
                             color: AppColors.error,
-                            bg: AppColors.error.withOpacity(0.08),
+                            bg: AppColors.error.withValues(alpha: 0.08),
                           ),
                         if (record!.overtimeMinutes > 0)
                           _StatChip(
@@ -1430,7 +1430,7 @@ class _InfoBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1470,7 +1470,7 @@ class _TimeBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -1590,12 +1590,12 @@ class _PressButtonState extends State<_PressButton>
           duration: const Duration(milliseconds: 200),
           height: 50,
           decoration: BoxDecoration(
-            color: active ? widget.color : widget.color.withOpacity(0.1),
+            color: active ? widget.color : widget.color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(14),
             boxShadow: active
                 ? [
                     BoxShadow(
-                        color: widget.color.withOpacity(0.35),
+                        color: widget.color.withValues(alpha: 0.35),
                         blurRadius: 12,
                         offset: const Offset(0, 4))
                   ]
@@ -1605,14 +1605,14 @@ class _PressButtonState extends State<_PressButton>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(widget.icon,
-                  color: active ? Colors.white : widget.color.withOpacity(0.35),
+                  color: active ? Colors.white : widget.color.withValues(alpha: 0.35),
                   size: 18),
               const SizedBox(width: 8),
               Text(widget.label,
                   style: TextStyle(
                       color: active
                           ? Colors.white
-                          : widget.color.withOpacity(0.35),
+                          : widget.color.withValues(alpha: 0.35),
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                       fontFamily: 'Inter')),
@@ -1711,12 +1711,12 @@ class _DutyCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isMyDuty ? _kOrange.withOpacity(0.4) : AppColors.border,
+            color: isMyDuty ? _kOrange.withValues(alpha: 0.4) : AppColors.border,
             width: isMyDuty ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 3),
             ),
@@ -1795,7 +1795,7 @@ class _ScheduleMini extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -1850,7 +1850,7 @@ class _ScheduleMini extends StatelessWidget {
                         boxShadow: isToday
                             ? [
                                 BoxShadow(
-                                    color: _kCard1.withOpacity(0.4),
+                                    color: _kCard1.withValues(alpha: 0.4),
                                     blurRadius: 10,
                                     offset: const Offset(0, 3))
                               ]
@@ -1916,7 +1916,7 @@ class _NewsMini extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -2073,7 +2073,7 @@ class _CardShell extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 14,
               offset: const Offset(0, 3),
             ),
@@ -2097,7 +2097,7 @@ class _IconBox extends StatelessWidget {
       width: 38,
       height: 38,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(11),
       ),
       child: Icon(icon, color: color, size: 18),
@@ -2184,7 +2184,7 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 4)),
         ],
@@ -2239,12 +2239,12 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
                       color: active
-                          ? t.color.withOpacity(0.12)
+                          ? t.color.withValues(alpha: 0.12)
                           : AppColors.background,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: active
-                            ? t.color.withOpacity(0.4)
+                            ? t.color.withValues(alpha: 0.4)
                             : AppColors.border,
                         width: active ? 1.5 : 1,
                       ),
@@ -2312,7 +2312,7 @@ class _OfficeStatusCardState extends State<_OfficeStatusCard> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: currentColor.withOpacity(0.12),
+                                color: currentColor.withValues(alpha: 0.12),
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
@@ -2525,16 +2525,16 @@ class _FeatureLinksSection extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: link.color.withOpacity(0.08),
+                color: link.color.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: link.color.withOpacity(0.25)),
+                border: Border.all(color: link.color.withValues(alpha: 0.25)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: link.color.withOpacity(0.15),
+                      color: link.color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(link.icon, color: link.color, size: 20),

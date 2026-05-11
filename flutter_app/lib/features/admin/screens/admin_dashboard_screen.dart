@@ -343,9 +343,9 @@ class _Header extends StatelessWidget {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
+                          color: Colors.white.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
                         ),
                         child: const Icon(Icons.admin_panel_settings_rounded,
                             color: Colors.white, size: 24),
@@ -385,9 +385,9 @@ class _Header extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.13),
+                  color: Colors.white.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,7 +420,7 @@ class _Header extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: (attendRate / 100).clamp(0.0, 1.0),
                         minHeight: 7,
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
                         color: _kTeal1,
                       ),
                     ),
@@ -516,7 +516,7 @@ class _GradCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: g1.withOpacity(0.35),
+            color: g1.withValues(alpha: 0.35),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),
@@ -526,7 +526,7 @@ class _GradCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: Colors.white.withOpacity(0.9), size: 20),
+          Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 20),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -579,7 +579,7 @@ class _WeeklyChartCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: _kBlue1.withOpacity(0.07), blurRadius: 20, offset: const Offset(0, 6)),
+          BoxShadow(color: _kBlue1.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 6)),
         ],
       ),
       child: Column(
@@ -704,8 +704,8 @@ class _WeeklyChartCard extends StatelessWidget {
                             show: true,
                             gradient: LinearGradient(
                               colors: [
-                                _kBlue1.withOpacity(0.18),
-                                _kBlue1.withOpacity(0.0),
+                                _kBlue1.withValues(alpha: 0.18),
+                                _kBlue1.withValues(alpha: 0.0),
                               ],
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -746,10 +746,10 @@ class _PendingAlert extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.error.withOpacity(0.25)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
         boxShadow: [
           BoxShadow(
-              color: AppColors.error.withOpacity(0.08),
+              color: AppColors.error.withValues(alpha: 0.08),
               blurRadius: 16,
               offset: const Offset(0, 4)),
         ],
@@ -1040,7 +1040,7 @@ class _FeatureCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.07),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1128,7 +1128,7 @@ class _CacheBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.warningLight,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

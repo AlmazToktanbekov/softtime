@@ -244,7 +244,7 @@ class _MenteeCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 backgroundImage: mentee['avatar_url'] != null ? NetworkImage(mentee['avatar_url']) : null,
                 child: mentee['avatar_url'] == null
                     ? Text(

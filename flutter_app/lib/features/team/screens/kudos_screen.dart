@@ -109,7 +109,7 @@ class _KudosScreenState extends ConsumerState<KudosScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: selectedEmoji == e ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+                        color: selectedEmoji == e ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(e, style: const TextStyle(fontSize: 28)),

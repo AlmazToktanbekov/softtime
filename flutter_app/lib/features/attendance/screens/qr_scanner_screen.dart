@@ -124,7 +124,7 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Colors.black.withOpacity(0.85),
+                    Colors.black.withValues(alpha: 0.85),
                     Colors.transparent
                   ],
                 ),
@@ -136,9 +136,9 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
+                      color: color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: color.withOpacity(0.5)),
+                      border: Border.all(color: color.withValues(alpha: 0.5)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -172,7 +172,7 @@ class _QRScannerScreenState extends State<QRScannerScreen>
                         : 'Наведите камеру на QR-код офиса',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: Colors.white.withOpacity(0.7), fontSize: 14),
+                        color: Colors.white.withValues(alpha: 0.7), fontSize: 14),
                   ),
                 ],
               ),
@@ -209,7 +209,7 @@ class _QRScannerScreenState extends State<QRScannerScreen>
           // Processing overlay
           if (_processing)
             Container(
-              color: Colors.black.withOpacity(0.6),
+              color: Colors.black.withValues(alpha: 0.6),
               child: Center(
                 child: Container(
                   padding: const EdgeInsets.all(28),
@@ -258,7 +258,7 @@ class _ScannerOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.55);
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.55);
     const scanSize = 260.0;
     final centerX = size.width / 2;
     final centerY = size.height / 2 - 40;

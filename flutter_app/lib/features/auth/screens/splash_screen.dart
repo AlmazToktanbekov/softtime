@@ -19,6 +19,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   void initState() {
     super.initState();
+    debugPrint('[Splash] initState');
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -32,23 +33,41 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _navigate() async {
+    debugPrint('[Splash] _navigate start');
     try {
-      await Future.wait([
-        Future.delayed(const Duration(milliseconds: 1800)),
-        ref
-            .read(authProvider.notifier)
-            .init()
-            .timeout(const Duration(seconds: 10), onTimeout: () => false),
+      final results = await Future.wait<dynamic>([
+        Future.delayed(const Duration(milliseconds: 1500)),
+        ref.read(authProvider.notifier).init().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => false,
+        ).catchError((e) {
+          debugPrint('[Splash] Auth init error: \$e');
+          return false;
+        }),
       ]);
-    } catch (_) {
-      // При любой ошибке — отправляем на логин
+      debugPrint('[Splash] init results: $results');
+    } catch (e) {
+      debugPrint('[Splash] Navigation setup error: \$e');
     }
+
     if (!mounted) return;
-    final auth = ref.read(authProvider);
-    if (auth.isAuthenticated) {
-      context.go('/home');
-    } else {
-      context.go('/login');
+
+    try {
+      final auth = ref.read(authProvider);
+      debugPrint('[Splash] auth status: isAuthenticated=${auth.isAuthenticated}, role=${auth.user?.role}');
+      if (auth.isAuthenticated) {
+        debugPrint('[Splash] Navigating to /home');
+        context.go('/home');
+      } else {
+        debugPrint('[Splash] Navigating to /login');
+        context.go('/login');
+      }
+    } catch (e) {
+      debugPrint('[Splash] Navigation failed: \$e');
+      if (mounted) {
+        debugPrint('[Splash] Falling back to /login');
+        context.go('/login');
+      }
     }
   }
 

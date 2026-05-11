@@ -332,7 +332,7 @@ class _InfoChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -342,7 +342,7 @@ class _InfoChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: color.withOpacity(0.8),
+                color: color.withValues(alpha: 0.8),
                 fontFamily: 'Inter',
               ),
             ),
@@ -434,7 +434,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

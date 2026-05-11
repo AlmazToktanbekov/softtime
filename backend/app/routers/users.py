@@ -20,6 +20,7 @@ from app.schemas.user import (
     UserRejectRequest,
     UserDetail,
     UserListItem,
+    UserRoleUpdateRequest,
     UserStatusUpdateRequest,
     UserUpdateRequest,
 )
@@ -252,6 +253,45 @@ def update_user(
             body="Ваш аккаунт активирован администратором. Добро пожаловать!",
             data={"type": "account_activated"},
         )
+
+    res = UserDetail.model_validate(target)
+    res.mentor_full_name = target.mentor.full_name if target.mentor else None
+    return res
+
+
+# ── PATCH /users/{user_id}/role ───────────────────────────────────────────────
+
+@router.patch("/{user_id}/role", response_model=UserDetail)
+def change_role(
+    user_id: uuid.UUID,
+    data: UserRoleUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    target = _get_user_or_404(db, user_id)
+
+    # Guard: only Super Admin may change or assign the Super Admin role
+    if target.role == UserRole.SUPER_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Нельзя изменить роль Super Admin")
+    if data.role == UserRole.SUPER_ADMIN and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Только Super Admin может назначить роль Super Admin")
+
+    old_role = target.role
+    target.role = data.role
+
+    write_audit(
+        db,
+        actor_id=current_user.id,
+        action="UPDATE_ROLE",
+        entity="User",
+        entity_id=target.id,
+        old_value={"role": old_role.value},
+        new_value={"role": data.role.value},
+        request=request,
+    )
+    db.commit()
+    db.refresh(target)
 
     res = UserDetail.model_validate(target)
     res.mentor_full_name = target.mentor.full_name if target.mentor else None

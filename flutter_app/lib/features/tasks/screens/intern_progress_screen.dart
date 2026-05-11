@@ -127,7 +127,7 @@ class _InternProgressScreenState extends ConsumerState<InternProgressScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4F46E5).withOpacity(0.3),
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -278,7 +278,7 @@ class _InternProgressScreenState extends ConsumerState<InternProgressScreen>
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: mood == val ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
+                          color: mood == val ? AppColors.primary.withValues(alpha: 0.15) : Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(e.value, style: const TextStyle(fontSize: 28)),
@@ -405,7 +405,7 @@ class _EvaluationCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text('${avg.toStringAsFixed(1)}/5.0', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),

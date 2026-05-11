@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../core/services/api_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers.dart';
 
@@ -82,7 +81,7 @@ class _DailyReportsScreenState extends ConsumerState<DailyReportsScreen> {
                               border: Border.all(color: AppColors.border),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
+                                  color: Colors.black.withValues(alpha: 0.04),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 )

@@ -21,14 +21,30 @@ void main() async {
   ]);
 
   await initializeDateFormatting('ru', null);
-  await ApiService().init();
+  debugPrint('[Main] Date formatting initialized');
 
-  // Firebase + FCM — таймаут 5 сек чтобы не вешать запуск если Firebase недоступен
-  await FcmService.init().timeout(
-    const Duration(seconds: 5),
-    onTimeout: () {},
-  );
+  // Initialize API before anything else
+  try {
+    await ApiService().init();
+    debugPrint('[Main] ApiService initialized');
+  } catch (e) {
+    debugPrint('[Main] Error initializing ApiService: $e');
+  }
 
+  // Firebase + FCM initialization with timeout to prevent app hang
+  // This runs in the background and doesn't block app startup
+  Future.delayed(const Duration(milliseconds: 500), () {
+    FcmService.init().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('[FCM] Init timeout - continuing without FCM');
+      },
+    ).catchError((e) {
+      debugPrint('[FCM] Init error: $e');
+    });
+  });
+
+  debugPrint('[Main] Running app');
   runApp(const ProviderScope(child: SoftTimeApp()));
 }
 

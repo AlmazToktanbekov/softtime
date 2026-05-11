@@ -107,6 +107,8 @@ class UserStatusUpdateRequest(BaseModel):
     status: UserStatus
     comment: Optional[str] = None
 
+class UserRoleUpdateRequest(BaseModel):
+    role: UserRole
 
 # ── Avatar response ───────────────────────────────────────────────────────────
 

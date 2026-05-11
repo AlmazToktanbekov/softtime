@@ -81,7 +81,7 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))],
       ),
       child: Column(
         children: [

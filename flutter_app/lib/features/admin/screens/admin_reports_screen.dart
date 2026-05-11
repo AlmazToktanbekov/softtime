@@ -1077,7 +1077,7 @@ class _WeeklyLineChart extends StatelessWidget {
         ),
         belowBarData: BarAreaData(
           show: true,
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
         ),
       );
 }

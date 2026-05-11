@@ -42,6 +42,13 @@ post_install do |installer|
     target.build_configurations.each do |config|
       # iOS 26+ симуляторы на Apple Silicon требуют arm64 — исключаем x86_64
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
+      
+      # Add Firebase Pod specific configurations
+      if target.name == 'Firebase'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PB_FIELD_16BIT=1'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PB_REP_16BIT=1'
+      end
     end
   end
 end

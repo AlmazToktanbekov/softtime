@@ -517,7 +517,7 @@ class _StatRow extends StatelessWidget {
           padding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
