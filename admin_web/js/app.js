@@ -523,7 +523,6 @@ async function openEmployeeProfile(userId) {
     showToast('Ошибка загрузки профиля: ' + e.message, 'error');
     return;
   }
-  window._currentEmpRole = emp.role;
 
   const avatarSrc = emp.avatar_url
     ? (emp.avatar_url.startsWith('http') ? emp.avatar_url : `${mediaBase}${emp.avatar_url}`)
@@ -612,7 +611,7 @@ async function openEmployeeProfile(userId) {
           </div>
 
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}')" style="width:100%">Сохранить изменения</button>
+            <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}', '${emp.role}')" style="width:100%">Сохранить изменения</button>
           </div>
         </div>
       </div>
@@ -622,7 +621,7 @@ async function openEmployeeProfile(userId) {
   document.body.appendChild(modal);
 }
 
-async function saveEmployeeDetails(userId) {
+async function saveEmployeeDetails(userId, originalRole) {
   const fullName = document.getElementById('empEditFullName').value.trim();
   const username = document.getElementById('empEditUsername').value.trim();
   const phone = document.getElementById('empEditPhone').value.trim();
@@ -644,7 +643,6 @@ async function saveEmployeeDetails(userId) {
     };
 
     // Если роль изменилась — вызываем отдельный endpoint
-    const originalRole = window._currentEmpRole || role;
     if (role !== originalRole) {
       await apiFetch(`/users/${userId}/role`, {
         method: 'PATCH',
