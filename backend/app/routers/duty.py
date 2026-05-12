@@ -13,6 +13,7 @@ from app.schemas.duty import (
     DutyQueueResponse,
     DutyAssignmentCreate,
     DutyAssignmentResponse,
+    DutyAssignmentMoveRequest,
     DutyCompletionSubmit,
     DutyVerifyRequest,
     DutySwapCreate,
