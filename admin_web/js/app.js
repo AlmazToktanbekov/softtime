@@ -523,6 +523,7 @@ async function openEmployeeProfile(userId) {
     showToast('Ошибка загрузки профиля: ' + e.message, 'error');
     return;
   }
+  window._currentEmpRole = emp.role;
 
   const avatarSrc = emp.avatar_url
     ? (emp.avatar_url.startsWith('http') ? emp.avatar_url : `${mediaBase}${emp.avatar_url}`)
@@ -643,7 +644,7 @@ async function saveEmployeeDetails(userId) {
     };
 
     // Если роль изменилась — вызываем отдельный endpoint
-    const originalRole = document.getElementById('empEditRole').dataset.original || role;
+    const originalRole = window._currentEmpRole || role;
     if (role !== originalRole) {
       await apiFetch(`/users/${userId}/role`, {
         method: 'PATCH',
