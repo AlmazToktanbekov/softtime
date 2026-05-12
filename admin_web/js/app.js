@@ -516,7 +516,7 @@ function renderEmployees(list) {
 // ── Employee Profile Modal ────────────────────────────────────────────────────
 async function openEmployeeProfile(userId) {
   const mediaBase = API.replace(/\/api\/v1\/?$/, '');
-  let emp;
+  var emp = null;
   try {
     emp = await apiFetch(`/users/${userId}`);
   } catch (e) {
