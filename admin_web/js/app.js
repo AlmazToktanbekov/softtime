@@ -601,7 +601,7 @@ async function openEmployeeProfile(userId) {
 
           <div class="form-group">
             <label class="form-label" style="font-size:12px">Роль</label>
-            <select id="empEditRole" class="form-input">
+            <select id="empEditRole" class="form-input" data-original="${emp.role}">
               <option value="EMPLOYEE" ${emp.role === 'EMPLOYEE' ? 'selected' : ''}>Сотрудник</option>
               <option value="INTERN" ${emp.role === 'INTERN' ? 'selected' : ''}>Стажёр</option>
               <option value="TEAM_LEAD" ${emp.role === 'TEAM_LEAD' ? 'selected' : ''}>Тимлид</option>
@@ -643,7 +643,8 @@ async function saveEmployeeDetails(userId) {
     };
 
     // Если роль изменилась — вызываем отдельный endpoint
-    if (role !== emp.role) {
+    const originalRole = document.getElementById('empEditRole').dataset.original || role;
+    if (role !== originalRole) {
       await apiFetch(`/users/${userId}/role`, {
         method: 'PATCH',
         body: JSON.stringify({ role: role }),
@@ -1601,6 +1602,7 @@ function switchDutyTab(tab, el) {
   if (tab === 'schedule') loadDutySchedule();
   else if (tab === 'calendar') loadDutyCalendar();
   else if (tab === 'stats') loadDutyStats();
+  else if (tab === 'history') loadDutyHistory();
   else loadDutyChecklist();
 }
 
@@ -1772,6 +1774,54 @@ async function loadDutyStats() {
   }
 }
 
+async function loadDutyHistory() {
+  try {
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0];
+    const list = await apiFetch(`/duty/schedule?start_date=${startDate}&end_date=${endDate}`) || [];
+
+    const typeLabel = t => t === 'LUNCH' ? '🍽️ Обед' : t === 'CLEANING' ? '🧹 Уборка' : t || '—';
+    const typeColor = t => t === 'LUNCH' ? 'var(--primary)' : 'var(--accent)';
+    const typeBg = t => t === 'LUNCH' ? 'rgba(26,115,232,0.1)' : 'rgba(0,200,83,0.1)';
+
+    // Sort by date descending
+    const sorted = [...list].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    document.getElementById('dutyContent').innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📜 История дежурств (последние 90 дней)</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Дата</th><th>Сотрудник</th><th>Тип</th><th>Выполнено</th><th>Подтверждено</th></tr></thead>
+            <tbody>${!sorted.length
+              ? '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Нет истории</td></tr>'
+              : sorted.map(d => `
+                <tr>
+                  <td style="font-weight:700">${d.date}</td>
+                  <td><div style="font-weight:700">${d.user_full_name || '—'}</div></td>
+                  <td>
+                    <span style="background:${typeBg(d.duty_type)};color:${typeColor(d.duty_type)};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">
+                      ${typeLabel(d.duty_type)}
+                    </span>
+                  </td>
+                  <td>${d.is_completed
+            ? '<span class="badge badge-present">✓ Да</span>'
+            : '<span class="badge badge-absent">✗ Нет</span>'}</td>
+                  <td>${d.verified
+            ? '<span class="badge badge-completed">✓ Да</span>'
+            : '<span class="badge badge-manual">— Нет</span>'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    document.getElementById('dutyContent').innerHTML = `<p style="color:var(--error); padding:20px">${e.message}</p>`;
+  }
+}
+
 async function autoAssignDuties() {
   const employees = await fetchAllUsers().then(list => list.filter(e => e.status === 'ACTIVE' || e.status === 'WARNING'));
   if (!employees.length) return showToast('Нет активных сотрудников', 'error');
@@ -1788,15 +1838,22 @@ async function autoAssignDuties() {
 
   try {
     let idx = 0;
+    const results = { success: 0, failed: 0 };
     for (const date of lunchDays) {
-      const user = employees[idx % employees.length];
-      await apiFetch('/duty/assign', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: user.id, date, duty_type: 'LUNCH' })
-      });
+      try {
+        const user = employees[idx % employees.length];
+        await apiFetch('/duty/assign', {
+          method: 'POST',
+          body: JSON.stringify({ user_id: user.id, date, duty_type: 'LUNCH' })
+        });
+        results.success++;
+      } catch (e) {
+        results.failed++;
+        console.error(`Failed to assign duty for ${date}:`, e);
+      }
       idx++;
     }
-    showToast(`Назначено ${lunchDays.length} дежурств на обед`, 'success');
+    showToast(`Назначено ${results.success} дежурств${results.failed > 0 ? ', ' + results.failed + ' ошибок' : ''}`, results.failed > 0 ? 'warning' : 'success');
     loadDutySchedule();
   } catch (e) {
     showToast('Ошибка: ' + e.message, 'error');
