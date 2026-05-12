@@ -46,6 +46,11 @@ class DutyCompletionSubmit(BaseModel):
     qr_token: str
 
 
+class DutyAssignmentMoveRequest(BaseModel):
+    new_date: date
+    new_user_id: Optional[UUID] = None
+
+
 class DutyCompletionResponse(BaseModel):
     message: str
     assignment_id: UUID

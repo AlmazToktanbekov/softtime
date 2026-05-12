@@ -158,6 +158,50 @@ def award_daily_attendance_points():
         db.close()
 
 
+def notify_duty_today():
+    """
+    В 9:00 утра уведомляет дежурных о том, что сегодня их дежурство.
+    """
+    from app.database import SessionLocal
+    from app.models.duty import DutyAssignment
+    from app.models.user import User, UserStatus
+    from app.utils.fcm import notify_user
+    from datetime import datetime
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+        duties = (
+            db.query(DutyAssignment)
+            .filter(
+                DutyAssignment.date == today,
+                DutyAssignment.is_completed == False,
+            )
+            .all()
+        )
+
+        notified = set()
+        for duty in duties:
+            if duty.user_id in notified:
+                continue
+            user = db.query(User).filter(User.id == duty.user_id).first()
+            if user and user.fcm_token:
+                duty_type_label = "обед 🍽️" if duty.duty_type.value == "LUNCH" else "уборка 🧹"
+                notify_user(
+                    user,
+                    title="Сегодня ваше дежурство!",
+                    body=f"Вы дежурите сегодня ({duty_type_label})",
+                    data={"type": "duty_today", "duty_id": str(duty.id)},
+                )
+                notified.add(duty.user_id)
+
+        logger.info(f"[CRON 09:00] Уведомлено {len(notified)} дежурных")
+    except Exception as e:
+        logger.error(f"[CRON 09:00] Ошибка уведомлений о дежурстве: {e}")
+    finally:
+        db.close()
+
+
 def notify_mentors_about_late_interns():
     """
     В 10:00 проверяем кто из стажеров не отметился, уведомляем их менторов.
@@ -233,6 +277,14 @@ def setup_scheduler():
         hour=10,
         minute=0,
         id="mentor_notify_10",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        notify_duty_today,
+        trigger="cron",
+        hour=9,
+        minute=0,
+        id="duty_notify_9",
         replace_existing=True,
     )
     return scheduler

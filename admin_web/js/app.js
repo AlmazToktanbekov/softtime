@@ -599,6 +599,17 @@ async function openEmployeeProfile(userId) {
             <input id="empEditTeam" class="form-input" value="${escHtml(emp.team_name || '')}">
           </div>
 
+          <div class="form-group">
+            <label class="form-label" style="font-size:12px">Роль</label>
+            <select id="empEditRole" class="form-input">
+              <option value="EMPLOYEE" ${emp.role === 'EMPLOYEE' ? 'selected' : ''}>Сотрудник</option>
+              <option value="INTERN" ${emp.role === 'INTERN' ? 'selected' : ''}>Стажёр</option>
+              <option value="TEAM_LEAD" ${emp.role === 'TEAM_LEAD' ? 'selected' : ''}>Тимлид</option>
+              <option value="ADMIN" ${emp.role === 'ADMIN' ? 'selected' : ''}>Админ</option>
+              <option value="SUPER_ADMIN" ${emp.role === 'SUPER_ADMIN' ? 'selected' : ''}>Супер Админ</option>
+            </select>
+          </div>
+
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}')" style="width:100%">Сохранить изменения</button>
           </div>
@@ -615,6 +626,7 @@ async function saveEmployeeDetails(userId) {
   const username = document.getElementById('empEditUsername').value.trim();
   const phone = document.getElementById('empEditPhone').value.trim();
   const team_name = document.getElementById('empEditTeam').value.trim();
+  const role = document.getElementById('empEditRole').value;
 
   // Валидация
   if (!fullName) return showToast('Введите ФИО', 'error');
@@ -629,6 +641,15 @@ async function saveEmployeeDetails(userId) {
       phone: phone || null,
       team_name: team_name || null
     };
+
+    // Если роль изменилась — вызываем отдельный endpoint
+    if (role !== emp.role) {
+      await apiFetch(`/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: role }),
+      });
+    }
+
     const updated = await apiFetch(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -1578,6 +1599,8 @@ function switchDutyTab(tab, el) {
   document.querySelectorAll('#page-duty .tab-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   if (tab === 'schedule') loadDutySchedule();
+  else if (tab === 'calendar') loadDutyCalendar();
+  else if (tab === 'stats') loadDutyStats();
   else loadDutyChecklist();
 }
 
@@ -1618,6 +1641,7 @@ async function loadDutySchedule() {
             ? '<span class="badge badge-completed">✓ Да</span>'
             : '<span class="badge badge-manual">— Нет</span>'}</td>
                   <td style="display:flex; gap:6px; flex-wrap:wrap">
+                    <button class="btn btn-ghost btn-sm" onclick="openTransferDuty('${d.id}', '${d.date}', '${d.user_id}')" style="color:var(--purple); border-color:var(--purple)">🔄 Перенести</button>
                     ${d.is_completed && !d.verified ? `
                       <button class="btn btn-ghost btn-sm" onclick="verifyDuty('${d.id}', true)" style="color:var(--accent); border-color:var(--accent)">✓ Подтв.</button>
                       <button class="btn btn-ghost btn-sm" onclick="verifyDuty('${d.id}', false)" style="color:var(--error); border-color:var(--error)">✕ Откл.</button>
@@ -1633,6 +1657,65 @@ async function loadDutySchedule() {
   }
 }
 
+async function loadDutyCalendar() {
+  try {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = firstDay.toISOString().split('T')[0];
+    const endDate = lastDay.toISOString().split('T')[0];
+
+    const list = await apiFetch(`/duty/schedule?start_date=${startDate}&end_date=${endDate}`) || [];
+    const dutyByDate = {};
+    list.forEach(d => {
+      if (!dutyByDate[d.date]) dutyByDate[d.date] = [];
+      dutyByDate[d.date].push(d);
+    });
+
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const startPadding = (firstDay.getDay() + 6) % 7;
+    const totalCells = startPadding + lastDay.getDate();
+
+    let calendarHTML = `<div class="card">
+      <div class="card-header">
+        <div class="card-title">📅 ${monthNames[month]} ${year}</div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; margin-bottom:8px">
+        ${daysOfWeek.map(d => `<div style="font-size:11px; font-weight:700; color:var(--text-muted); padding:8px 0">${d}</div>`).join('')}
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px">`;
+
+    for (let i = 0; i < totalCells; i++) {
+      const dayNum = i - startPadding + 1;
+      if (dayNum < 1) {
+        calendarHTML += '<div></div>';
+      } else {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        const duties = dutyByDate[dateStr] || [];
+        const isToday = dateStr === today.toISOString().split('T')[0];
+        const isWeekend = new Date(dateStr).getDay() === 0 || new Date(dateStr).getDay() === 6;
+
+        calendarHTML += `<div style="min-height:80px; background:${isToday ? 'rgba(67,97,238,0.1)' : isWeekend ? 'rgba(0,0,0,0.02)' : 'var(--surface)'}; border:1px solid ${isToday ? 'var(--primary)' : 'var(--border)'}; border-radius:8px; padding:6px">
+          <div style="font-size:12px; font-weight:${isToday ? '800' : '600'}; color:${isToday ? 'var(--primary)' : 'var(--text-sub)'}">${dayNum}</div>
+          <div style="margin-top:4px">${duties.map(d => `
+            <div style="font-size:10px; padding:2px 4px; border-radius:4px; margin-bottom:2px; background:${d.duty_type === 'LUNCH' ? 'var(--primary-light)' : 'var(--accent-light)'}; color:${d.duty_type === 'LUNCH' ? 'var(--primary)' : 'var(--accent)'}; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+              ${d.duty_type === 'LUNCH' ? '🍽️' : '🧹'} ${d.user_full_name?.split(' ')[0] || '—'}
+            </div>`).join('')}
+          </div>
+        </div>`;
+      }
+    }
+
+    calendarHTML += '</div></div>';
+    document.getElementById('dutyContent').innerHTML = calendarHTML;
+  } catch (e) {
+    document.getElementById('dutyContent').innerHTML = `<p style="color:var(--error); padding:20px">${e.message}</p>`;
+  }
+}
+
 async function manualCompleteDuty(id) {
   if (!confirm('Отметить дежурство как выполненное вручную?')) return;
   try {
@@ -1640,6 +1723,119 @@ async function manualCompleteDuty(id) {
     showToast('Дежурство отмечено вручную', 'success');
     loadDutySchedule();
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function loadDutyStats() {
+  try {
+    const stats = await apiFetch('/duty/stats') || [];
+    const totalDuties = stats.reduce((sum, s) => sum + s.total, 0);
+    const completedDuties = stats.reduce((sum, s) => sum + s.completed, 0);
+
+    document.getElementById('dutyContent').innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📊 Статистика дежурств (за 90 дней)</div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:20px">
+          <div style="background:var(--primary-light); padding:16px; border-radius:12px; text-align:center">
+            <div style="font-size:28px; font-weight:800; color:var(--primary)">${stats.length}</div>
+            <div style="font-size:12px; color:var(--text-sub)">Сотрудников</div>
+          </div>
+          <div style="background:var(--accent-light); padding:16px; border-radius:12px; text-align:center">
+            <div style="font-size:28px; font-weight:800; color:var(--accent)">${totalDuties}</div>
+            <div style="font-size:12px; color:var(--text-sub)">Всего дежурств</div>
+          </div>
+          <div style="background:rgba(0,200,83,0.1); padding:16px; border-radius:12px; text-align:center">
+            <div style="font-size:28px; font-weight:800; color:rgb(0,150,0)">${completedDuties}</div>
+            <div style="font-size:12px; color:var(--text-sub)">Выполнено</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Сотрудник</th><th>Всего</th><th>Выполнено</th><th>Подтверждено</th><th>Пропущено</th></tr></thead>
+            <tbody>${!stats.length
+              ? '<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Нет данных</td></tr>'
+              : stats.map(s => `
+                <tr>
+                  <td style="font-weight:700">${s.full_name || '—'}</td>
+                  <td><span class="badge badge-primary">${s.total}</span></td>
+                  <td>${s.completed}</td>
+                  <td>${s.verified}</td>
+                  <td>${s.missed > 0 ? `<span style="color:var(--error); font-weight:700">${s.missed}</span>` : '0'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    document.getElementById('dutyContent').innerHTML = `<p style="color:var(--error); padding:20px">${e.message}</p>`;
+  }
+}
+
+async function autoAssignDuties() {
+  const employees = await fetchAllUsers().then(list => list.filter(e => e.status === 'ACTIVE' || e.status === 'WARNING'));
+  if (!employees.length) return showToast('Нет активных сотрудников', 'error');
+
+  const startDate = new Date();
+  const endDate = new Date(Date.now() + 30 * 86400000);
+  const lunchDays = [];
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) lunchDays.push(d.toISOString().split('T')[0]);
+  }
+
+  if (!confirm(`Назначить дежурных на обед на ${lunchDays.length} рабочих дней? Сотрудники будут распределены по очереди.`)) return;
+
+  try {
+    let idx = 0;
+    for (const date of lunchDays) {
+      const user = employees[idx % employees.length];
+      await apiFetch('/duty/assign', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: user.id, date, duty_type: 'LUNCH' })
+      });
+      idx++;
+    }
+    showToast(`Назначено ${lunchDays.length} дежурств на обед`, 'success');
+    loadDutySchedule();
+  } catch (e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
+}
+
+async function openTransferDuty(id, date, userId) {
+  document.getElementById('transferAssignmentId').value = id;
+  document.getElementById('transferCurrentDate').textContent = date;
+  document.getElementById('transferNewDate').value = date;
+
+  const employees = await fetchAllUsers().then(list => list.filter(e => e.status === 'ACTIVE' || e.status === 'WARNING'));
+  document.getElementById('transferNewEmployee').innerHTML = '<option value="">— Оставить того же —</option>' +
+    employees.map(e => `<option value="${e.id}">${e.full_name}</option>`).join('');
+
+  openModal('transferDuty');
+}
+
+async function saveTransferDuty() {
+  const id = document.getElementById('transferAssignmentId').value;
+  const newDate = document.getElementById('transferNewDate').value;
+  const newUserId = document.getElementById('transferNewEmployee').value;
+
+  if (!newDate) return showToast('Выберите новую дату', 'error');
+
+  try {
+    await apiFetch(`/duty/assign/${id}/move`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        new_date: newDate,
+        new_user_id: newUserId || null
+      })
+    });
+    showToast('Дежурство перенесено', 'success');
+    closeModal('transferDuty');
+    loadDutySchedule();
+  } catch (e) {
+    showToast('Ошибка: ' + e.message, 'error');
+  }
 }
 
 async function loadDutyChecklist() {

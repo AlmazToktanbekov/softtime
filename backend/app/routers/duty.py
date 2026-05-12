@@ -188,6 +188,56 @@ def get_duty_overview(
     ]
 
 
+# ============ Duty Statistics ============
+
+
+@router.get("/stats", response_model=List[dict])
+def get_duty_stats(
+    start_date: date = Query(default=None),
+    end_date: date = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Статистика дежурств: сколько раз каждый сотрудник дежурил.
+    """
+    from datetime import date as date_cls
+    from sqlalchemy import func
+
+    today = date_cls.today()
+    if not start_date:
+        start_date = today - timedelta(days=90)
+    if not end_date:
+        end_date = today + timedelta(days=30)
+
+    results = (
+        db.query(
+            User.id,
+            User.full_name,
+            func.count(DutyAssignment.id).label("total"),
+            func.sum(func.cast(DutyAssignment.is_completed, int)).label("completed"),
+            func.sum(func.cast(DutyAssignment.verified, int)).label("verified"),
+        )
+        .join(DutyAssignment, User.id == DutyAssignment.user_id)
+        .filter(DutyAssignment.date >= start_date, DutyAssignment.date <= end_date)
+        .group_by(User.id, User.full_name)
+        .order_by(func.count(DutyAssignment.id).desc())
+        .all()
+    )
+
+    return [
+        {
+            "user_id": str(r.id),
+            "full_name": r.full_name,
+            "total": r.total,
+            "completed": r.completed or 0,
+            "verified": r.verified or 0,
+            "missed": r.total - (r.completed or 0),
+        }
+        for r in results
+    ]
+
+
 # ============ Duty Assignments (Admin) ============
 
 
@@ -341,6 +391,55 @@ def delete_assignment(
     db.delete(assignment)
     db.commit()
     return {"message": "Назначение удалено"}
+
+
+@router.patch("/assign/{assignment_id}/move", response_model=DutyAssignmentResponse)
+def move_duty(
+    assignment_id: UUID,
+    data: DutyAssignmentMoveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Перенести дежурство на другую дату.
+    """
+    assignment = db.query(DutyAssignment).filter(DutyAssignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Назначение не найдено")
+
+    old_date = assignment.date
+    old_user_id = assignment.user_id
+
+    # Check if target date already has assignment of same type
+    existing = db.query(DutyAssignment).filter(
+        DutyAssignment.date == data.new_date,
+        DutyAssignment.duty_type == assignment.duty_type,
+    ).first()
+
+    if existing:
+        # Swap users
+        existing.user_id = old_user_id
+        existing.date = old_date
+
+    assignment.date = data.new_date
+
+    if data.new_user_id:
+        assignment.user_id = data.new_user_id
+
+    db.commit()
+    db.refresh(assignment)
+
+    write_audit(
+        db,
+        actor_id=current_user.id,
+        action="MOVE_DUTY",
+        entity="DutyAssignment",
+        entity_id=assignment.id,
+        old_value={"date": str(old_date), "user_id": str(old_user_id)},
+        new_value={"date": str(data.new_date), "user_id": str(assignment.user_id)},
+    )
+
+    return assignment
 
 
 # ============ My Duties ============

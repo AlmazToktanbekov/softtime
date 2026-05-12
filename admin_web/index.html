@@ -646,9 +646,12 @@
           Расписание обеда (пн–вс) и уборки, назначение ответственных, подтверждение после QR или вручную.
  </p>
         <button class="btn btn-primary" onclick="openAssignDutyModal()">+ Назначить дежурного</button>
+        <button class="btn btn-secondary" onclick="autoAssignDuties()">🤖 Авторазначить</button>
       </div>
       <div class="tabs">
         <button class="tab-btn active" onclick="switchDutyTab('schedule', this)">Расписание</button>
+        <button class="tab-btn" onclick="switchDutyTab('calendar', this)">📅 Календарь</button>
+        <button class="tab-btn" onclick="switchDutyTab('stats', this)">📊 Статистика</button>
         <button class="tab-btn" onclick="switchDutyTab('checklist', this)">Чеклист задач</button>
       </div>
       <div id="dutyContent"></div>
@@ -770,6 +773,35 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('assignDuty')">Отмена</button>
       <button class="btn btn-primary" onclick="saveDutyAssignment()">Назначить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Duty Modal -->
+<div class="modal-overlay" id="modal-transferDuty">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Перенести дежурство</div>
+      <button class="modal-close" onclick="closeModal('transferDuty')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Текущая дата</label>
+      <div id="transferCurrentDate" style="font-weight:700; color:var(--primary)"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новая дата *</label>
+      <input class="form-input" id="transferNewDate" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новый сотрудник (необязательно)</label>
+      <select class="form-input" id="transferNewEmployee">
+        <option value="">— Оставить того же —</option>
+      </select>
+    </div>
+    <input type="hidden" id="transferAssignmentId">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('transferDuty')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveTransferDuty()">Перенести</button>
     </div>
   </div>
 </div>
