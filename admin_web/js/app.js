@@ -2398,3 +2398,82 @@ document.querySelectorAll('.sidebar-item').forEach(item => {
     }
   });
 });
+
+// ============ QR Scanner for Admin ============
+let qrScanStream = null;
+
+function openQRScanModal() {
+  document.getElementById('qrManualToken').value = '';
+  document.getElementById('startQRScanBtn').style.display = 'block';
+  document.getElementById('qrScanVideo').innerHTML = '<div style="text-align:center"><p style="margin-bottom:8px">Камера недоступна</p><p style="font-size:12px; color:#888">Нажмите кнопку ниже для старта</p></div>';
+  openModal('qrScan');
+}
+
+async function startQRScan() {
+  const video = document.getElementById('qrScanVideo');
+  const btn = document.getElementById('startQRScanBtn');
+
+  try {
+    qrScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.innerHTML = '';
+    const videoEl = document.createElement('video');
+    videoEl.style.width = '100%';
+    videoEl.style.height = '100%';
+    videoEl.style.objectFit = 'cover';
+    videoEl.srcObject = qrScanStream;
+    videoEl.play();
+    video.appendChild(videoEl);
+    btn.style.display = 'none';
+
+    // Simple scan - just show message that camera is running
+    showToast('Камера работает! Введите токен вручную или используйте сканер', 'info');
+  } catch (e) {
+    showToast('Не удалось получить доступ к камере: ' + e.message, 'error');
+  }
+}
+
+async function submitQRScan() {
+  const token = document.getElementById('qrManualToken').value.trim();
+  if (!token) return showToast('Введите токен QR-кода', 'error');
+
+  // Stop camera if running
+  if (qrScanStream) {
+    qrScanStream.getTracks().forEach(track => track.stop());
+    qrScanStream = null;
+  }
+
+  try {
+    showToast('Отмечаем...', 'info');
+    const res = await apiFetch('/attendance/check-in', {
+      method: 'POST',
+      body: JSON.stringify({ qr_token: token })
+    });
+
+    if (res && res.check_in_time) {
+      showToast('✅ Приход отмечен в ' + res.check_in_time.slice(0, 5), 'success');
+      closeModal('qrScan');
+    }
+  } catch (e) {
+    // If check-in fails, try check-out
+    try {
+      const res2 = await apiFetch('/attendance/check-out', {
+        method: 'POST',
+        body: JSON.stringify({ qr_token: token })
+      });
+      if (res2 && res2.check_out_time) {
+        showToast('✅ Уход отмечен в ' + res2.check_out_time.slice(0, 5), 'success');
+        closeModal('qrScan');
+      }
+    } catch (e2) {
+      showToast('Ошибка: ' + (e.message || e2.message), 'error');
+    }
+  }
+}
+
+// Close QR scan modal cleanup
+document.getElementById('modal-qrScan').addEventListener('click', function(e) {
+  if (e.target === this && qrScanStream) {
+    qrScanStream.getTracks().forEach(track => track.stop());
+    qrScanStream = null;
+  }
+});
