@@ -21,12 +21,9 @@ class CheckOutRequest(BaseModel):
 
 
 class AttendanceManualUpdate(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    check_in_time: Optional[str] = None
-    check_out_time: Optional[str] = None
+    check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
     note: Optional[str] = None
-    is_manual: Optional[bool] = True
 
 
 class AttendanceAdminCloseRequest(BaseModel):

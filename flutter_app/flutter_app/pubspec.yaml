@@ -1,0 +1,67 @@
+name: softtime
+description: SoftTime — система управления офисом
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # HTTP
+  dio: ^5.4.1
+  
+  # State management
+  flutter_riverpod: ^2.5.1
+  
+  # Secure storage
+  flutter_secure_storage: ^10.0.0
+
+  # QR Scanner
+  mobile_scanner: ^7.0.0
+  
+  # UI
+  google_fonts: ^6.2.1
+  fl_chart: ^0.67.0
+  shimmer: ^3.0.0
+  
+  # Image picker (gallery / camera)
+  image_picker: ^1.1.2
+
+  # Image caching
+  cached_network_image: ^3.3.0
+  flutter_cache_manager: ^3.3.1
+  http_parser: ^4.0.2
+
+  # Utils
+  intl: ^0.19.0
+  shared_preferences: ^2.2.3
+  
+  # Navigation
+  go_router: ^13.2.1
+  firebase_core: ^4.7.0
+  firebase_messaging: ^16.2.0
+  flutter_local_notifications: ^21.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1877F2"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icon/

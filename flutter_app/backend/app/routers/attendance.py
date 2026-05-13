@@ -253,15 +253,9 @@ def manual_update(
         raise HTTPException(status_code=404, detail="Запись не найдена")
 
     if data.check_in_time is not None:
-        try:
-            record.check_in_time = datetime.fromisoformat(data.check_in_time.replace('Z', '+00:00'))
-        except:
-            pass
+        record.check_in_time = data.check_in_time
     if data.check_out_time is not None:
-        try:
-            record.check_out_time = datetime.fromisoformat(data.check_out_time.replace('Z', '+00:00'))
-        except:
-            pass
+        record.check_out_time = data.check_out_time
     if data.note is not None:
         record.note = data.note
 

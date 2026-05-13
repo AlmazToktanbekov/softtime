@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "701430347456",
+    "project_id": "softjol-11565",
+    "storage_bucket": "softjol-11565.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:701430347456:android:b5b7afdaeb3e0b4b08df25",
+        "android_client_info": {
+          "package_name": "com.example.attendance_tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWej_YvF5YiunZMVKaz2uT3bIHuYfSTVU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

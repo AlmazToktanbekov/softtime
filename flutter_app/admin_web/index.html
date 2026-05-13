@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SoftTime — Панель администратора</title>
+  <link rel="icon" type="image/png" href="logo4_21.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- Mobile Header (hidden on desktop) -->
+<div class="mobile-header" id="mobileHeader" style="display:none">
+  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+  <span class="mobile-logo">SoftTime</span>
+  <span class="mobile-user" id="mobileUser"></span>
+</div>
+
+<!-- Sidebar Overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- Login Page -->
+<div class="login-page" id="loginPage">
+  <div class="login-card">
+    <div class="login-logo"><img src="logo.png" alt="SoftTime" style="width:60px;height:60px;object-fit:contain;display:block;"></div>
+    <h1 class="login-title">SoftTime</h1>
+    <p class="login-sub">Панель администратора</p>
+    <div class="login-error" id="loginError"></div>
+    <input type="text" class="login-field" id="loginUsername" placeholder="Логин или email" autocomplete="username">
+    <input type="password" class="login-field" id="loginPassword" placeholder="Пароль" autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()">Войти</button>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <img src="logo.png" alt="SoftTime" style="width:32px;height:32px;object-fit:contain;border-radius:8px;flex-shrink:0;">
+    <div class="sidebar-logo-text">
+      <h1>SoftTime</h1>
+      <p>Панель администратора</p>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Главная</p>
+    <div class="sidebar-item active" onclick="showPage('dashboard', this)">
+      <span class="nav-icon">🏠</span> Дашборд
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Управление</p>
+    <div class="sidebar-item" onclick="showPage('employees', this)">
+      <span class="nav-icon">👥</span> Сотрудники
+      <span id="pendingBadge" style="margin-left:auto; background:#E53935; color:#fff; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; display:none">0</span>
+    </div>
+    <div class="sidebar-item" onclick="showPage('attendance', this)">
+      <span class="nav-icon">✅</span> Посещаемость
+    </div>
+    <div class="sidebar-item" onclick="showPage('duty', this)">
+      <span class="nav-icon">🧹</span> Дежурство
+      <span style="opacity:.55;font-size:10px;display:block;font-weight:700;margin-top:2px">обед · уборка</span>
+    </div>
+    <div class="sidebar-item" onclick="showPage('news', this)">
+      <span class="nav-icon">📰</span> Новости
+    </div>
+    <div class="sidebar-item" onclick="showPage('schedule', this)">
+      <span class="nav-icon">📅</span> Расписание
+    </div>
+    <div class="sidebar-item" onclick="showPage('networks', this)">
+      <span class="nav-icon">🌐</span> Сети офисов
+    </div>
+    <div class="sidebar-item" onclick="showPage('qr', this)">
+      <span class="nav-icon">📷</span> QR-коды
+    </div>
+    <div class="sidebar-item" onclick="showPage('requests', this)">
+      <span class="nav-icon">📝</span> Заявки
+      <span id="requestsBadge" style="margin-left:auto; background:#E53935; color:#fff; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; display:none">0</span>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <p class="sidebar-section-label">Аналитика</p>
+    <div class="sidebar-item" onclick="showPage('reports', this)">
+      <span class="nav-icon">📈</span> Отчёты
+    </div>
+    <div class="sidebar-item" onclick="showPage('auditlog', this)">
+      <span class="nav-icon">🔍</span> Журнал действий
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-item" onclick="doLogout()" style="color:var(--error)">
+      <span class="nav-icon">🚪</span> Выйти
+    </div>
+  </div>
+</nav>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+<!-- Main Content -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Открыть меню">☰</button>
+      <div>
+        <div class="topbar-title" id="pageTitle">Дашборд</div>
+        <div class="topbar-date" id="topbarDate"></div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="topbar-icon-btn" title="Сканировать QR" onclick="openQRScanModal()" style="background:none;border:none;cursor:pointer;font-size:20px">
+        📷
+      </button>
+      <div class="topbar-user" onclick="showPage('employees', document.querySelector('[onclick*=employees]'))">
+        <div class="user-avatar" id="sidebarAvatar">A</div>
+        <div class="topbar-user-info">
+          <div class="topbar-user-name" id="sidebarName">Admin</div>
+          <div class="topbar-user-role">Администратор</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Обзор</div>
+          <div style="font-size:13px; color: var(--text-sub); margin-top:4px" id="dashDate"></div>
+        </div>
+        <button class="btn btn-primary" onclick="loadDashboard()">🔄 Обновить</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card stat-card-primary">
+          <div class="stat-card-top">
+            <div class="stat-icon">👥</div>
+            <span class="stat-badge stat-badge-up" id="statTotalBadge" style="display:none"></span>
+          </div>
+          <div>
+            <div class="stat-value" id="statTotal">—</div>
+            <div class="stat-label">Всего сотрудников</div>
+            <div class="stat-meta">Активных сотрудников</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background:var(--accent-light)">✅</div>
+            <span class="stat-badge stat-badge-up" id="statPresentBadge" style="display:none"></span>
+          </div>
+          <div>
+            <div class="stat-value" style="color:var(--accent)" id="statPresent">—</div>
+            <div class="stat-label">Сейчас в офисе</div>
+            <div class="stat-meta">Присутствуют сегодня</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background:var(--warning-light)">⚠️</div>
+          </div>
+          <div>
+            <div class="stat-value" style="color:var(--warning)" id="statLate">—</div>
+            <div class="stat-label">Опоздали</div>
+            <div class="stat-meta">Пришли с опозданием</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <div class="stat-icon" style="background:var(--error-light)">❌</div>
+          </div>
+          <div>
+            <div class="stat-value" style="color:var(--error)" id="statAbsent">—</div>
+            <div class="stat-label">Не пришли</div>
+            <div class="stat-meta">Отсутствуют сегодня</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Посещаемость сегодня</div>
+          </div>
+          <div id="attendanceRate" style="font-size:48px; font-weight:900; color:var(--primary); margin-bottom:8px">—%</div>
+          <div style="font-size:13px; color:var(--text-sub)">Процент присутствия</div>
+          <div style="height:16px"></div>
+          <div id="progressBars"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Последние записи</div>
+          </div>
+          <div id="latestRecords"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px">
+        <div class="card-header">
+          <div class="card-title">📈 Посещаемость за неделю</div>
+        </div>
+        <div id="dashWeekChartWrap" style="position:relative;height:260px">
+          <canvas id="dashWeekChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+<div class="modal-overlay" id="modal-manualCheckout">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Ручной уход</div>
+      <button class="modal-close" onclick="closeModal('manualCheckout')">✕</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Сотрудник</label>
+      <input class="form-input" id="manualCheckoutEmployee" disabled>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Дата и время ухода</label>
+      <input class="form-input" id="manualCheckoutTime" type="datetime-local">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Комментарий</label>
+      <input class="form-input" id="manualCheckoutNote" placeholder="Например: сотрудник забыл отметить уход">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('manualCheckout')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveManualCheckout()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-approvedAbsence">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Разрешённое отсутствие</div>
+      <button class="modal-close" onclick="closeModal('approvedAbsence')">✕</button>
+    </div>
+    <p style="color:var(--text-sub); font-size:13px; margin-bottom:16px">Укажите, что сотруднику дано разрешение не прийти (больничный, отпуск, удалёнка и т.д.).</p>
+    <div class="form-group">
+      <label class="form-label">Сотрудник</label>
+      <select class="form-input" id="approvedAbsenceEmployeeId">
+        <option value="">— Выберите сотрудника —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Дата</label>
+      <input class="form-input" id="approvedAbsenceDate" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Комментарий (причина)</label>
+      <textarea class="form-input" id="approvedAbsenceNote" rows="3" placeholder="Например: больничный, отпуск, удалённая работа"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('approvedAbsence')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveApprovedAbsence()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+    <!-- EMPLOYEES PAGE -->
+    <div class="page" id="page-employees">
+      <div class="section-header">
+        <div class="section-title">Сотрудники</div>
+        <button class="btn btn-primary" onclick="openModal('addEmployee')">+ Добавить</button>
+      </div>
+
+      <div class="tabs" style="margin-bottom:20px">
+        <button class="tab-btn active" id="tabActive" onclick="switchEmpTab('active', this)">Активные</button>
+        <button class="tab-btn" id="tabPending" onclick="switchEmpTab('pending', this)">
+          Ожидают одобрения
+          <span id="pendingTabCount" style="margin-left:6px; background:#E53935; color:#fff; border-radius:999px; padding:1px 7px; font-size:11px; display:none">0</span>
+        </button>
+      </div>
+
+      <!-- Active employees -->
+      <div id="empActiveSection">
+        <div class="filters">
+          <input type="text" class="filter-input" placeholder="Команда/отдел" id="empDeptFilter" oninput="filterEmployees()">
+          <select class="filter-input" id="empRoleFilter" onchange="filterEmployees()">
+            <option value="">Все роли</option>
+            <option value="EMPLOYEE">Сотрудник</option>
+            <option value="TEAM_LEAD">Тимлид</option>
+            <option value="INTERN">Стажёр</option>
+            <option value="ADMIN">Админ</option>
+          </select>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--text-sub)">
+            <input type="checkbox" id="showInactiveEmployees" onchange="loadEmployees()">
+            Показать неактивных
+          </label>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Команда</th>
+                  <th>Роль</th>
+                  <th>Email</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="employeesTable">
+                <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending employees -->
+      <div id="empPendingSection" style="display:none">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Email</th>
+                  <th>Телефон</th>
+                  <th>Зарегистрировался</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody id="pendingTable">
+                <tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE PAGE -->
+    <div class="page" id="page-attendance">
+      <div class="section-header">
+        <div class="section-title">Посещаемость</div>
+        <button class="btn btn-ghost" style="border-color:var(--primary); color:var(--primary)" onclick="openApprovedAbsenceModal()">✓ Разрешённое отсутствие</button>
+      </div>
+
+      <div class="filters">
+        <input type="date" class="filter-input" id="attStartDate">
+        <span style="color:var(--text-sub); font-weight:600">—</span>
+        <input type="date" class="filter-input" id="attEndDate">
+        <input type="number" class="filter-input" placeholder="ID сотрудника" id="attEmpId" style="width:160px">
+        <button class="btn btn-primary btn-sm" onclick="loadAttendance()">Применить</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetAttFilters()">Сбросить</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+  <tr>
+    <th>Дата</th>
+    <th>Сотрудник</th>
+    <th>Приход</th>
+    <th>Уход</th>
+    <th>Рабочее время</th>
+    <th>Статус</th>
+    <th>Опоздание</th>
+    <th>Раньше пришёл</th>
+    <th>Раньше ушёл</th>
+    <th>Позже ушёл</th>
+    <th>Действия</th>
+  </tr>
+</thead>
+            <tbody id="attendanceTable">
+              <tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- conditions-->
+
+  <div class="page" id="page-worktime">
+  <div class="section-header">
+    <div class="section-title">Рабочее время</div>
+  </div>
+
+  <div class="card" style="max-width:760px">
+    <div class="card-header">
+      <div class="card-title">Настройки графика</div>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Начало работы — час</label>
+        <input class="form-input" id="workStartHour" type="number" min="0" max="23">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Начало работы — минуты</label>
+        <input class="form-input" id="workStartMinute" type="number" min="0" max="59">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Конец работы — час</label>
+        <input class="form-input" id="workEndHour" type="number" min="0" max="23">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Конец работы — минуты</label>
+        <input class="form-input" id="workEndMinute" type="number" min="0" max="59">
+      </div>
+
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Допустимое опоздание (минут)</label>
+        <input class="form-input" id="gracePeriodMinutes" type="number" min="0" max="180">
+      </div>
+    </div>
+
+    <div style="display:grid; gap:12px; margin-top:12px">
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countEarlyArrival">
+        Учитывать ранний приход
+      </label>
+
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countEarlyLeave">
+        Учитывать ранний уход
+      </label>
+
+      <label style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text-sub)">
+        <input type="checkbox" id="countOvertime">
+        Учитывать переработку
+      </label>
+    </div>
+
+    <div class="modal-footer" style="margin-top:24px; justify-content:flex-start">
+      <button class="btn btn-primary" onclick="saveWorkTimeSettings()">Сохранить</button>
+      <button class="btn btn-ghost" onclick="loadWorkTimeSettings()">Обновить</button>
+    </div>
+  </div>
+</div>
+
+    <!-- NETWORKS PAGE -->
+     <div class="page" id="page-networks">
+  <div class="section-header">
+    <div class="section-title">Офисные сети</div>
+    <button class="btn btn-primary" onclick="openModal('addNetwork')">+ Добавить сеть</button>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>IP-адрес</th>
+            <th>Диапазон IP</th>
+            <th>Описание</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="networksTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+    <!-- QR PAGE -->
+<div class="page" id="page-qr">
+  <div class="section-header">
+    <div class="section-title">Управление QR-кодом</div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Текущий QR-код</div>
+        <button class="btn btn-primary btn-sm" onclick="loadCurrentQR()">Обновить</button>
+      </div>
+      <div class="qr-container" id="qrContainer">
+        <p style="color:var(--text-muted)">Загрузка QR-кода...</p>
+      </div>
+      <div style="margin-top:16px; text-align:center">
+        <button class="btn btn-primary" onclick="generateNewQR()" style="width:100%">🔄 Сгенерировать новый QR</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Инструкция</div></div>
+      <div style="color:var(--text-sub); font-size:14px; line-height:1.8">
+        <p>1. Распечатайте или отобразите QR-код в офисе</p>
+        <p style="margin-top:8px">2. Сотрудники сканируют его при приходе/уходе через мобильное приложение</p>
+        <p style="margin-top:8px">3. Система проверяет QR и IP-адрес офисной сети</p>
+        <p style="margin-top:8px">4. При необходимости сгенерируйте новый QR или активируйте старый</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <div class="card-title">История QR-кодов</div>
+      <button class="btn btn-primary btn-sm" onclick="loadQrHistory()">Обновить</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Тип</th>
+            <th>Создан</th>
+            <th>Истекает</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="qrHistoryTable">
+          <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+    <!-- REPORTS PAGE -->
+    <div class="page" id="page-reports">
+      <div class="section-header">
+        <div class="section-title">Отчёты посещаемости</div>
+      </div>
+
+      <!-- Mode tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchReportMode('period', this)">📊 По периоду</button>
+        <button class="tab-btn" onclick="switchReportMode('employee', this)">👤 По сотруднику</button>
+      </div>
+
+      <!-- Filters -->
+      <div class="card" style="margin-bottom:16px;padding:16px 20px">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <!-- Quick period buttons -->
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Период</div>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-sm btn-ghost period-quick" id="pq-today" onclick="setQuickPeriod('today',this)">Сегодня</button>
+              <button class="btn btn-sm btn-ghost period-quick active" id="pq-week" onclick="setQuickPeriod('week',this)">Неделя</button>
+              <button class="btn btn-sm btn-ghost period-quick" id="pq-month" onclick="setQuickPeriod('month',this)">Месяц</button>
+            </div>
+          </div>
+
+          <!-- Date range -->
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">С</div>
+            <input type="date" class="filter-input" id="repStartDate" style="width:155px" onchange="clearQuickPeriod()">
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">По</div>
+            <input type="date" class="filter-input" id="repEndDate" style="width:155px" onchange="clearQuickPeriod()">
+          </div>
+
+          <!-- Employee filter (employee mode only) -->
+          <div id="repEmployeeFilter" style="display:none">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Сотрудник</div>
+            <select class="filter-input" id="repEmployeeId" style="width:230px">
+              <option value="">— Выберите сотрудника —</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" onclick="loadReports()" style="align-self:flex-end">🔍 Показать</button>
+        </div>
+      </div>
+
+      <div id="reportContent"></div>
+    </div>
+
+    <!-- REQUESTS PAGE -->
+    <div class="page" id="page-requests">
+      <div class="section-header">
+        <div class="section-title">Заявки сотрудников</div>
+      </div>
+
+      <div class="filters">
+        <select class="filter-input" id="reqStatus" style="width:220px">
+          <option value="">Все статусы</option>
+          <option value="new">Новая</option>
+          <option value="reviewing">Рассматривается</option>
+          <option value="approved">Одобрена</option>
+          <option value="rejected">Отклонена</option>
+          <option value="needs_clarification">Нужно уточнение</option>
+        </select>
+        <input type="number" class="filter-input" id="reqEmpId" placeholder="ID сотрудника" style="width:160px">
+        <select class="filter-input" id="reqType" style="width:240px">
+          <option value="">Все типы</option>
+          <option value="sick">Больничный</option>
+          <option value="family">Семейные обстоятельства</option>
+          <option value="vacation">Отпуск</option>
+          <option value="business_trip">Командировка</option>
+          <option value="remote_work">Удалённая работа</option>
+          <option value="late_reason">Опоздание (по причине)</option>
+          <option value="early_leave">Ранний уход (по причине)</option>
+          <option value="other">Другое</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="loadRequests()">Применить</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetRequestFilters()">Сбросить</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Сотрудник</th>
+                <th>Тип</th>
+                <th>Период</th>
+                <th>Комментарий сотрудника</th>
+                <th>Статус</th>
+                <th>Комментарий админа</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="requestsTable">
+              <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUTY PAGE -->
+    <div class="page" id="page-duty">
+      <div class="section-header">
+        <div class="section-title">Дежурство — кто и когда</div>
+        <p style="font-size:13px;color:var(--text-sub);margin-bottom:16px;max-width:720px;line-height:1.5">
+          Расписание обеда (пн–вс) и уборки, назначение ответственных, подтверждение после QR или вручную.
+ </p>
+        <button class="btn btn-primary" onclick="openAssignDutyModal()">+ Назначить дежурного</button>
+        <button class="btn btn-secondary" onclick="autoAssignDuties()">🤖 Авторазначить</button>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchDutyTab('schedule', this)">Расписание</button>
+        <button class="tab-btn" onclick="switchDutyTab('calendar', this)">📅 Календарь</button>
+        <button class="tab-btn" onclick="switchDutyTab('stats', this)">📊 Статистика</button>
+        <button class="tab-btn" onclick="switchDutyTab('history', this)">📜 История</button>
+        <button class="tab-btn" onclick="switchDutyTab('checklist', this)">Чеклист задач</button>
+      </div>
+      <div id="dutyContent"></div>
+    </div>
+
+    <!-- NEWS PAGE -->
+    <div class="page" id="page-news">
+      <div class="section-header">
+        <div class="section-title">Новости</div>
+        <button class="btn btn-primary" onclick="openAddNewsModal()">+ Создать новость</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Заголовок</th>
+                <th>Тип</th>
+                <th>Закреплено</th>
+                <th>Прочитали</th>
+                <th>Дата</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="newsTable">
+              <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOG PAGE -->
+    <div class="page" id="page-auditlog">
+      <div class="section-header">
+        <div class="section-title">Журнал действий администратора</div>
+        <button class="btn btn-primary" onclick="loadAuditLog()">🔄 Обновить</button>
+      </div>
+      <div class="filters" style="margin-bottom:16px">
+        <input class="filter-input" id="auditSearch" placeholder="Поиск по действию..." style="width:240px" oninput="loadAuditLog()">
+        <select class="filter-input" id="auditAction" style="width:220px" onchange="loadAuditLog()">
+          <option value="">Все действия</option>
+          <option value="CREATE_USER">Создание сотрудника</option>
+          <option value="UPDATE_USER">Изменение сотрудника</option>
+          <option value="APPROVE_USER">Подтверждение</option>
+          <option value="REJECT_USER">Отклонение</option>
+          <option value="DEACTIVATE_USER">Деактивация</option>
+          <option value="ASSIGN_DUTY">Назначение дежурства</option>
+          <option value="CREATE_NEWS">Создание новости</option>
+          <option value="DELETE_NEWS">Удаление новости</option>
+          <option value="COMPLETE_DUTY_MANUAL">Ручное подтверждение дежурства</option>
+        </select>
+        <input class="filter-input" id="auditDateFrom" type="date" style="width:160px" onchange="loadAuditLog()">
+        <input class="filter-input" id="auditDateTo" type="date" style="width:160px" onchange="loadAuditLog()">
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Время</th>
+              <th>Администратор</th>
+              <th>Действие</th>
+              <th>Объект</th>
+              <th>Детали</th>
+            </tr></thead>
+            <tbody id="auditLogTable">
+              <tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:32px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCHEDULE PAGE -->
+    <div class="page" id="page-schedule">
+      <div class="section-header">
+        <div class="section-title">Расписание сотрудников</div>
+      </div>
+      <div class="filters">
+        <select class="filter-input" id="scheduleEmpSelect" style="width:300px" onchange="loadEmployeeSchedule()">
+          <option value="">— Выберите сотрудника —</option>
+        </select>
+      </div>
+      <div id="scheduleContent">
+        <p style="color:var(--text-muted); text-align:center; padding:40px">Выберите сотрудника для просмотра расписания</p>
+      </div>
+    </div>
+
+<!-- Assign Duty Modal -->
+<div class="modal-overlay" id="modal-assignDuty">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Назначить дежурного</div>
+      <button class="modal-close" onclick="closeModal('assignDuty')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Сотрудник *</label>
+      <select class="form-input" id="dutyEmployeeId">
+        <option value="">— Выберите сотрудника —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Тип дежурства *</label>
+      <div style="display:flex; gap:10px; margin-top:6px">
+        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; font-weight:700; font-size:14px; transition:all .15s" id="dutyTypeLunchLabel">
+          <input type="radio" name="dutyType" id="dutyTypeLunch" value="LUNCH" checked onchange="updateDutyTypeStyle()">
+          🍽️ Обед
+        </label>
+        <label style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; font-weight:700; font-size:14px; transition:all .15s" id="dutyTypeCleaningLabel">
+          <input type="radio" name="dutyType" id="dutyTypeCleaning" value="CLEANING" onchange="updateDutyTypeStyle()">
+          🧹 Уборка
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Дата *</label>
+      <input class="form-input" id="dutyDate" type="date">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('assignDuty')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveDutyAssignment()">Назначить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer Duty Modal -->
+<div class="modal-overlay" id="modal-transferDuty">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔄 Перенести дежурство</div>
+      <button class="modal-close" onclick="closeModal('transferDuty')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Текущая дата</label>
+      <div id="transferCurrentDate" style="font-weight:700; color:var(--primary)"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новая дата *</label>
+      <input class="form-input" id="transferNewDate" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новый сотрудник (необязательно)</label>
+      <select class="form-input" id="transferNewEmployee">
+        <option value="">— Оставить того же —</option>
+      </select>
+    </div>
+    <input type="hidden" id="transferAssignmentId">
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('transferDuty')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveTransferDuty()">Перенести</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add News Modal -->
+<div class="modal-overlay" id="modal-addNews">
+  <div class="modal" style="width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="newsModalTitle">Создать новость</div>
+      <button class="modal-close" onclick="closeModal('addNews')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Заголовок *</label>
+      <input class="form-input" id="newsTitle" placeholder="Заголовок новости">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Текст *</label>
+      <textarea class="form-input" id="newsContent" rows="5" placeholder="Текст новости..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Тип</label>
+      <select class="form-input" id="newsType">
+        <option value="general">Общее</option>
+        <option value="announcement">Объявление</option>
+        <option value="urgent">Срочно</option>
+        <option value="system_update">Обновление системы</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Фото (необязательно)</label>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <input type="file" id="newsImageFile" accept="image/*" onchange="previewNewsImage(this)" style="flex:1; min-width:0">
+        <button class="btn btn-ghost btn-sm" onclick="uploadNewsImage()" id="newsUploadBtn" style="display:none">Загрузить</button>
+      </div>
+      <div id="newsImagePreview" style="margin-top:10px; display:none">
+        <img id="newsImagePreviewImg" style="max-width:100%; max-height:180px; border-radius:10px; border:1px solid var(--border)">
+        <div style="margin-top:6px; font-size:12px; color:var(--text-sub)" id="newsImageStatus"></div>
+      </div>
+      <input type="hidden" id="newsImageUrl">
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px">
+      <input type="checkbox" id="newsPinned" style="width:16px; height:16px">
+      <label for="newsPinned" style="font-size:14px; font-weight:700; color:var(--text-sub); cursor:pointer">📌 Закрепить новость</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addNews')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveNews()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div class="modal-overlay" id="modal-addEmployee">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Новый сотрудник</div>
+      <button class="modal-close" onclick="closeModal('addEmployee')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">ФИО *</label>
+        <input class="form-input" id="empFullName" placeholder="Иванов Иван Иванович">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input class="form-input" id="empEmail" type="email" placeholder="ivan@company.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Телефон</label>
+        <input class="form-input" id="empPhone" placeholder="+7 999 000 00 00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Отдел</label>
+        <input class="form-input" id="empDept" placeholder="Разработка">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Должность</label>
+        <input class="form-input" id="empPos" placeholder="Разработчик">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Логин *</label>
+        <input class="form-input" id="empUsername" placeholder="ivan.ivanov">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Пароль *</label>
+        <input class="form-input" id="empPassword" type="password" placeholder="••••••••">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addEmployee')">Отмена</button>
+      <button class="btn btn-primary" onclick="createEmployee()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Network Modal -->
+<div class="modal-overlay" id="modal-addNetwork">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Добавить офисную сеть</div>
+      <button class="modal-close" onclick="closeModal('addNetwork')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название *</label>
+      <input class="form-input" id="netName" placeholder="Главный офис">
+    </div>
+    <div class="form-group">
+      <label class="form-label">IP-адрес офиса</label>
+      <input class="form-input" id="netIp" placeholder="203.0.113.10">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Диапазон IP (CIDR)</label>
+      <input class="form-input" id="netRange" placeholder="192.168.1.0/24">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Описание</label>
+      <input class="form-input" id="netDesc" placeholder="Описание сети">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addNetwork')">Отмена</button>
+      <button class="btn btn-primary" onclick="createNetwork()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal: Reset Password -->
+<div class="modal-overlay" id="modal-resetPassword">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔑 Сброс пароля</h3>
+      <button class="modal-close" onclick="closeModal('resetPassword')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="resetPwdUserId">
+      <p style="margin-bottom:16px; color:var(--text-sub); font-size:14px">
+        Сотрудник: <strong id="resetPwdUserName"></strong>
+      </p>
+      <p style="margin-bottom:16px; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:12px; font-size:13px; color:var(--text-sub); line-height:1.5">
+        ⚠️ Введите новый пароль и передайте его сотруднику лично или через мессенджер. Сотрудник сможет сменить пароль после входа.
+      </p>
+      <div class="form-group">
+        <label>Новый пароль</label>
+        <input type="password" id="resetPwdInput" placeholder="Минимум 6 символов" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Подтвердите пароль</label>
+        <input type="password" id="resetPwdConfirm" placeholder="Повторите пароль" autocomplete="new-password">
+      </div>
+      <p id="resetPwdError" style="color:var(--danger); font-size:13px; margin-top:4px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('resetPassword')">Отмена</button>
+      <button class="btn btn-primary" onclick="confirmResetPassword()">Сохранить пароль</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: QR Scan -->
+<div class="modal-overlay" id="modal-qrScan">
+  <div class="modal" style="max-width:450px">
+    <div class="modal-header">
+      <h3>📷 Сканировать QR-код</h3>
+      <button class="modal-close" onclick="closeModal('qrScan')">×</button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <p style="margin-bottom:16px; color:var(--text-sub)">Отсканируйте QR-код офиса для отметки прихода или ухода</p>
+      <div id="qrScanVideo" style="width:100%; height:300px; background:#000; border-radius:12px; margin-bottom:16px; display:flex; align-items:center; justify-content:center; color:#fff">
+        <div>
+          <p style="margin-bottom:8px">Камера недоступна</p>
+          <p style="font-size:12px; color:#888">Нажмите кнопку ниже для старта</p>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="startQRScan()" id="startQRScanBtn" style="width:100%">📷 Запустить камеру</button>
+      <div style="margin-top:16px">
+        <label style="font-size:13px; color:var(--text-sub)">Или введите токен вручную:</label>
+        <input type="text" id="qrManualToken" class="form-input" placeholder="Введите QR токен" style="margin-top:8px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('qrScan')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitQRScan()">Отметить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="js/app.js?v=13"></script>
+</body>
+</html>
