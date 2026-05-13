@@ -502,7 +502,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       actionLoading: _actionLoading,
                       schedule: _todaySchedule,
                       liveTime: _liveWorkTime(),
-                      enableCheckInOut: !auth.isAdmin,
+                      enableCheckInOut: true,
                       onCheckIn: _onCheckIn,
                       onCheckOut: _onCheckOut,
                     ),
