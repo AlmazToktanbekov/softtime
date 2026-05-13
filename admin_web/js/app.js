@@ -609,9 +609,10 @@ async function openEmployeeProfile(userId) {
               <option value="SUPER_ADMIN" ${emp.role === 'SUPER_ADMIN' ? 'selected' : ''}>Супер Админ</option>
             </select>
           </div>
+          <input type="hidden" id="empOriginalRole" value="${emp.role}">
 
           <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}', '${emp.role}')" style="width:100%">Сохранить изменения</button>
+            <button class="btn btn-primary" onclick="saveEmployeeDetails('${emp.id}')" style="width:100%">Сохранить изменения</button>
           </div>
         </div>
       </div>
@@ -621,12 +622,13 @@ async function openEmployeeProfile(userId) {
   document.body.appendChild(modal);
 }
 
-async function saveEmployeeDetails(userId, originalRole) {
+async function saveEmployeeDetails(userId) {
   const fullName = document.getElementById('empEditFullName').value.trim();
   const username = document.getElementById('empEditUsername').value.trim();
   const phone = document.getElementById('empEditPhone').value.trim();
   const team_name = document.getElementById('empEditTeam').value.trim();
   const role = document.getElementById('empEditRole').value;
+  const originalRole = document.getElementById('empOriginalRole').value;
 
   // Валидация
   if (!fullName) return showToast('Введите ФИО', 'error');
