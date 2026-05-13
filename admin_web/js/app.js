@@ -705,7 +705,8 @@ async function uploadEmployeeAvatar(userId, input) {
 }
 
 function filterEmployees() {
-  const search = document.getElementById('globalSearch').value.toLowerCase();
+  const searchEl = document.getElementById('globalSearch');
+  const search = searchEl ? searchEl.value.toLowerCase() : '';
   const dept = document.getElementById('empDeptFilter').value.toLowerCase();
   const role = document.getElementById('empRoleFilter').value;
   const showInactive = document.getElementById('showInactiveEmployees')?.checked;
